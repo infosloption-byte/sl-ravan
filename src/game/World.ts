@@ -92,7 +92,7 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
 
   // Terrain with a naturally winding earthen path painted directly in the mesh.
   const land = MeshBuilder.CreateGround("forest-terrain", {
-    width: 200, height: 230, subdivisions: 136
+    width: 200, height: 230, subdivisions: 136, updatable: true
   }, scene);
   const positions = land.getVerticesData(VertexBuffer.PositionKind);
   const indices = land.getIndices();
