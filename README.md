@@ -75,3 +75,10 @@ The eventual multiplayer implementation will introduce a shared domain simulatio
 - Save data is only in the current browser and is not synchronized.
 
 See docs/ROADMAP.md for the staged plan and quality acceptance checklist.
+
+## Milestone 2 foliage and bundle fixes
+
+- Tree canopy, bushes and ferns use `packInstanceMatrices()` to correctly pack 16 floating-point values per Babylon thin instance. This resolves disappearing foliage caused by `flatMap()` on typed arrays.
+- Tree trunks are now also rendered in two instanced batches rather than many individual meshes. Actual GPU performance must be measured on a local machine.
+- The React launcher dynamically imports the Babylon game module. This splits the large game module away from the initial UI bundle; it does not reduce the total engine download.
+- Vitest is upgraded to 5.1.0 to address audited vulnerabilities in older mocker/tinypool dependencies. Node.js 22.12 or later is required. Reinstall, rerun `npm audit` and check tests after the major-version change.

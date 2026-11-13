@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { RavanGame, type GameStats } from "./game/RavanGame";
+import type { RavanGame, GameStats } from "./game/RavanGame";
 
 const initialStats: GameStats = {
   fps: 0,
@@ -31,22 +31,31 @@ export default function App() {
     let disposed = false;
     let instance: RavanGame | null = null;
 
-    try {
-      instance = new RavanGame(canvas.current, {
-        onReady: () => { if (!disposed) setReady(true); },
-        onStats: (next) => { if (!disposed) setStats(next); },
-        onNotice: (message) => { if (!disposed) setNotice(message); },
-        onEscape: () => {
-          if (!disposed) {
-            setPaused(true);
-            setShowHelp(false);
-          }
-        },
+    // The 3D engine is loaded separately from the lightweight React launcher.
+    // Cancellation handles the extra setup/cleanup cycle in React StrictMode.
+    void import("./game/RavanGame")
+      .then(({ RavanGame }) => {
+        if (disposed || !canvas.current) return;
+        try {
+          instance = new RavanGame(canvas.current, {
+            onReady: () => { if (!disposed) setReady(true); },
+            onStats: (next) => { if (!disposed) setStats(next); },
+            onNotice: (message) => { if (!disposed) setNotice(message); },
+            onEscape: () => {
+              if (!disposed) {
+                setPaused(true);
+                setShowHelp(false);
+              }
+            },
+          });
+          game.current = instance;
+        } catch (e) {
+          if (!disposed) setError(e instanceof Error ? e.message : "Unable to start the 3D engine.");
+        }
+      })
+      .catch((e: unknown) => {
+        if (!disposed) setError(e instanceof Error ? e.message : "Unable to load the 3D engine.");
       });
-      game.current = instance;
-    } catch (e) {
-      if (!disposed) setError(e instanceof Error ? e.message : "Unable to start the 3D engine.");
-    }
 
     return () => {
       disposed = true;

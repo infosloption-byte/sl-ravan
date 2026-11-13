@@ -3,6 +3,7 @@ import {
   Quaternion, Scene, ShadowGenerator, StandardMaterial, Vector3
 } from "@babylonjs/core";
 import type { Interaction } from "./World";
+import { packInstanceMatrices } from "./InstanceMatrices";
 
 /**
  * An ORIGINAL, fantasy interpretation of an ancient Lankan stone sanctuary.
@@ -224,7 +225,7 @@ export function createLankaTheme(scene: Scene, shadows: ShadowGenerator, heightA
       height: 1.2, diameterTop: .015, diameterBottom: .30, tessellation: 3
     }, scene);
     leaf.material = material;
-    leaf.thinInstanceSetBuffer("matrix", new Float32Array(matrices[i].flatMap(m => m.asArray())), 16, true);
+    leaf.thinInstanceSetBuffer("matrix", packInstanceMatrices(matrices[i]), 16, true);
     leaf.thinInstanceRefreshBoundingInfo();
   });
 

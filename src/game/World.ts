@@ -4,6 +4,7 @@ import {
   VertexBuffer, VertexData
 } from "@babylonjs/core";
 import { createLankaTheme } from "./LankaTheme";
+import { packInstanceMatrices } from "./InstanceMatrices";
 
 /**
  * First environment concept: a dense, sunlit forest village.
@@ -88,6 +89,7 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
   const bushMats = ["#306c44", "#43854a", "#608b43", "#759b53"]
     .map((hex, i) => material(scene, "understory-" + i, hex));
   const canopyTransforms: Matrix[][] = leafMaterials.map(() => []);
+  const trunkTransforms: Matrix[][] = [[], []];
   const lantern = material(scene, "warm-lantern", "#fff2b6", { emissive: "#eebc69" });
   const shrineLight = material(scene, "ancient-arcane", "#72d6d3", { emissive: "#2fb6ae" });
   const cloth = material(scene, "ribbon-fabric", "#a6c7b2", { alpha: .9 });
@@ -141,13 +143,11 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
     const y = groundHeight(x, z);
     const height = (ancient ? randomBetween(11, 16) : randomBetween(6.5, 10.5)) * scale;
     const width = (ancient ? 1.9 : .9) * scale;
-    const stem = MeshBuilder.CreateCylinder("tree-trunk", {
-      height, diameterBottom: width * 1.5, diameterTop: width * .58, tessellation: 8
-    }, scene);
-    stem.position.set(x, y + height * .46, z);
-    stem.rotation.z = randomBetween(-.09, .09);
-    stem.material = ancient ? barkDark : trunk;
-    if (ancient || random() < .13) shadows.addShadowCaster(stem);
+    trunkTransforms[ancient ? 1 : 0].push(Matrix.Compose(
+      new Vector3(width, height, width),
+      Quaternion.FromEulerAngles(0, 0, randomBetween(-.09, .09)),
+      new Vector3(x, y + height * .46, z)
+    ));
 
     const crowns = ancient ? 7 : 4;
     for (let i = 0; i < crowns; i++) {
@@ -188,13 +188,24 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
     [-21, 98, 1.7], [22, -55, 1.4], [-20, -77, 1.75]
   ].forEach(([x, z, scale]) => treeAt(x, z, scale, true));
 
+  // Group hundreds of trunks into just two thin-instanced draw groups.
+  trunkTransforms.forEach((transforms, i) => {
+    const source = MeshBuilder.CreateCylinder("trunk-batch-" + i, {
+      height: 1, diameterTop: .58, diameterBottom: 1.5, tessellation: 8
+    }, scene);
+    source.material = i === 1 ? barkDark : trunk;
+    source.receiveShadows = true;
+    source.thinInstanceSetBuffer("matrix", packInstanceMatrices(transforms), 16, true);
+    source.thinInstanceRefreshBoundingInfo();
+  });
+
   // Batch the canopy as six groups rather than hundreds of individual meshes.
   // Thin instances preserve varied silhouettes at substantially lower draw-call cost.
   canopyTransforms.forEach((transforms, i) => {
     const source = MeshBuilder.CreateIcoSphere("canopy-batch-" + i, { radius: 1, subdivisions: 2 }, scene);
     source.material = leafMaterials[i];
     source.receiveShadows = true;
-    source.thinInstanceSetBuffer("matrix", new Float32Array(transforms.flatMap(m => m.asArray())), 16, true);
+    source.thinInstanceSetBuffer("matrix", packInstanceMatrices(transforms), 16, true);
     source.thinInstanceRefreshBoundingInfo();
   });
 
@@ -215,7 +226,7 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
   bushTransforms.forEach((transforms, i) => {
     const source = MeshBuilder.CreateIcoSphere("bush-batch-" + i, { radius: 1, subdivisions: 1 }, scene);
     source.material = bushMats[i];
-    source.thinInstanceSetBuffer("matrix", new Float32Array(transforms.flatMap(m => m.asArray())), 16, true);
+    source.thinInstanceSetBuffer("matrix", packInstanceMatrices(transforms), 16, true);
     source.thinInstanceRefreshBoundingInfo();
   });
 

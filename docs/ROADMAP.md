@@ -74,3 +74,9 @@ Story geography, characters, historical/fantastical interpretation, missions, an
 ## Proposed asset pipeline
 
 Blender (.blend source) → validated glTF/GLB → texture compression / mesh optimization → hashed assets on a CDN → scene asset manifest. Avoid committing huge, unoptimized binaries to Git; use storage/CDN or Git LFS when justified.
+
+## Foliage regression diagnosis (13 November 2026)
+
+After converting foliage to thin instances, canopies and fern fronds disappeared. The root cause was wrapping `transforms.flatMap(m => m.asArray())` in a `Float32Array`. Typed arrays are not flattened by JavaScript `flatMap`, so each resulting element was coerced to NaN. A typed-array packer and three regression tests now cover this bug. The fix must be visually checked before the milestone is merged.
+
+The next art-production stage requires original detailed GLB characters, tree leaves, rocks and architectural meshes, and PBR material authoring. Procedural meshes are still only blockout assets.
