@@ -1,8 +1,9 @@
 import {
-  Color3, DynamicTexture, GlowLayer, Matrix, Mesh, MeshBuilder, Quaternion,
+  Color3, DynamicTexture, GlowLayer, Matrix, MeshBuilder, Quaternion,
   Scene, ShadowGenerator, StandardMaterial, Vector3,
   VertexBuffer, VertexData
 } from "@babylonjs/core";
+import { createLankaTheme } from "./LankaTheme";
 
 /**
  * First environment concept: a dense, sunlit forest village.
@@ -86,6 +87,7 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
     .map((hex, i) => material(scene, "leaf-" + i, hex));
   const bushMats = ["#306c44", "#43854a", "#608b43", "#759b53"]
     .map((hex, i) => material(scene, "understory-" + i, hex));
+  const canopyTransforms: Matrix[][] = leafMaterials.map(() => []);
   const lantern = material(scene, "warm-lantern", "#fff2b6", { emissive: "#eebc69" });
   const shrineLight = material(scene, "ancient-arcane", "#72d6d3", { emissive: "#2fb6ae" });
   const cloth = material(scene, "ribbon-fabric", "#a6c7b2", { alpha: .9 });
@@ -149,15 +151,15 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
 
     const crowns = ancient ? 7 : 4;
     for (let i = 0; i < crowns; i++) {
-      const mesh = MeshBuilder.CreateIcoSphere("canopy-cluster", { radius: 1, subdivisions: 2 }, scene);
       const offsetX = randomBetween(-2.2, 2.2) * scale;
       const offsetZ = randomBetween(-1.9, 1.9) * scale;
       const radius = randomBetween(2.2, 3.45) * scale * (ancient ? 1.22 : 1);
-      mesh.position.set(x + offsetX, y + height * randomBetween(.70, 1.00), z + offsetZ);
-      mesh.scaling.set(radius, radius * randomBetween(.62, .92), radius * randomBetween(.80, 1.15));
-      mesh.rotation.y = random() * 6.2;
-      mesh.material = leafMaterials[Math.floor(random() * leafMaterials.length)];
-      mesh.receiveShadows = true;
+      const leafType = Math.floor(random() * leafMaterials.length);
+      canopyTransforms[leafType].push(Matrix.Compose(
+        new Vector3(radius, radius * randomBetween(.62, .92), radius * randomBetween(.80, 1.15)),
+        Quaternion.FromEulerAngles(0, random() * Math.PI * 2, 0),
+        new Vector3(x + offsetX, y + height * randomBetween(.70, 1.00), z + offsetZ)
+      ));
     }
 
     if (ancient) {
@@ -186,21 +188,40 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
     [-21, 98, 1.7], [22, -55, 1.4], [-20, -77, 1.75]
   ].forEach(([x, z, scale]) => treeAt(x, z, scale, true));
 
+  // Batch the canopy as six groups rather than hundreds of individual meshes.
+  // Thin instances preserve varied silhouettes at substantially lower draw-call cost.
+  canopyTransforms.forEach((transforms, i) => {
+    const source = MeshBuilder.CreateIcoSphere("canopy-batch-" + i, { radius: 1, subdivisions: 2 }, scene);
+    source.material = leafMaterials[i];
+    source.receiveShadows = true;
+    source.thinInstanceSetBuffer("matrix", new Float32Array(transforms.flatMap(m => m.asArray())), 16, true);
+    source.thinInstanceRefreshBoundingInfo();
+  });
+
   // Understory bushes: cheaper than detailed photo assets, but lots of depth.
+  const bushTransforms: Matrix[][] = bushMats.map(() => []);
   for (let i = 0; i < 260; i++) {
     const x = randomBetween(-88, 88);
     const z = randomBetween(-100, 103);
     if (Math.abs(x - pathCenter(z)) < 4.6) continue;
     const radius = randomBetween(.38, 1.15);
-    const leaf = MeshBuilder.CreateIcoSphere("woodland-bush", { radius: 1, subdivisions: 1 }, scene);
-    leaf.position.set(x, groundHeight(x, z) + radius * .28, z);
-    leaf.scaling.set(radius * 1.5, radius * .75, radius);
-    leaf.material = bushMats[Math.floor(random() * bushMats.length)];
+    const type = Math.floor(random() * bushMats.length);
+    bushTransforms[type].push(Matrix.Compose(
+      new Vector3(radius * 1.5, radius * .75, radius),
+      Quaternion.FromEulerAngles(0, random() * Math.PI * 2, 0),
+      new Vector3(x, groundHeight(x, z) + radius * .28, z)
+    ));
   }
+  bushTransforms.forEach((transforms, i) => {
+    const source = MeshBuilder.CreateIcoSphere("bush-batch-" + i, { radius: 1, subdivisions: 1 }, scene);
+    source.material = bushMats[i];
+    source.thinInstanceSetBuffer("matrix", new Float32Array(transforms.flatMap(m => m.asArray())), 16, true);
+    source.thinInstanceRefreshBoundingInfo();
+  });
 
   // Thousands of foliage blades, rendered in only two thin-instance batches.
   function grassLayer(name: string, hex: string, count: number, height: number) {
-    const blade = MeshBuilder.CreatePlane(name, { width: .19, height, sideOrientation: Mesh.DOUBLESIDE }, scene);
+    const blade = MeshBuilder.CreateCylinder(name, { height, diameterTop: .012, diameterBottom: .18, tessellation: 3 }, scene);
     const bladeMat = material(scene, name + "-mat", hex);
     bladeMat.backFaceCulling = false;
     blade.material = bladeMat;
@@ -392,6 +413,12 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
     flower.material = blossomColors[Math.floor(random() * blossomColors.length)];
   }
 
+  // The separately authored theme is completely modular: scenery, location
+  // interactions and broad-phase blockers are added without changing the player.
+  const lankaTheme = createLankaTheme(scene, shadows, groundHeight);
+  blockers.push(...lankaTheme.blockers);
+  interactions.push(...lankaTheme.interactions);
+
   // Lanterns remain visible during daytime, then gain contrast at night.
   let isNight = false;
   return {
@@ -417,6 +444,7 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
       glow.intensity = night ? 1.0 : .58;
       cloth.alpha = night ? .82 : .9;
       earth.alpha = 1;
+      lankaTheme.setNight(night);
     },
   };
 }

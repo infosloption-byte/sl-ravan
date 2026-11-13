@@ -6,7 +6,7 @@
 
 ## First environment
 
-The Verdant Approach leads into **Whisperwood Village** and onwards to the **Elder Grove**, where an ancient shrine can be discovered. The visual direction is a colorful, atmospheric forest village with dense canopy, organic paths, mossy timber cottages, warm lanterns, and soft fog.
+The Ancient Forest leads into the **Lanka Forest Settlement** and onwards to the **Royal Sanctuary**, where an ancient shrine can be discovered. A Ravana-inspired fantasy gateway, carved pavilions, lotus pools, inlaid stone path and tropical fern patches establish the art direction. The visual direction is a colorful, atmospheric forest village with dense canopy, organic paths, mossy timber cottages, warm lanterns, and soft fog.
 
 All first-stage world geometry and wood textures are procedurally generated. No third-party character models, textures, or paid assets are required.
 
@@ -69,6 +69,7 @@ The eventual multiplayer implementation will introduce a shared domain simulatio
 - Kinematic character movement and simple house colliders; Havok physics is not integrated yet.
 - Generated prototype geometry rather than authored, optimized GLB assets.
 - Forest environment is bounded, not infinite world streaming.
+- Theme architecture is an original fantasy interpretation, not a claim of historical reconstruction.
 - No account system, backend, combat, quests, or multiplayer yet.
 - No sound files or audio system yet.
 - Save data is only in the current browser and is not synchronized.

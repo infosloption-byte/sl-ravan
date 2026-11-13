@@ -17,6 +17,8 @@ The reference is **inspiration, not a licensed asset**. All shipped models/textu
 - [x] Day/night lighting switch
 - [x] Local browser save with schema validation and tests
 - [ ] Validate browser performance and appearance on actual desktop hardware
+- [x] Add ancient Lanka architectural theme as a separate module
+- [x] Batch canopy and bushes using thin instancing for lower draw-call overhead
 - [ ] Replace placeholder models with polished assets
 
 ## Milestone B — Visual polish and streaming foundation

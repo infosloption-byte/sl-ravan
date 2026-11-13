@@ -4,7 +4,7 @@ import { RavanGame, type GameStats } from "./game/RavanGame";
 const initialStats: GameStats = {
   fps: 0,
   position: { x: 0, z: 0 },
-  location: "The Verdant Approach",
+  location: "The Ancient Forest",
   nearby: null,
 };
 
@@ -23,7 +23,7 @@ export default function App() {
   const [paused, setPaused] = useState(true);
   const [night, setNight] = useState(false);
   const [stats, setStats] = useState<GameStats>(initialStats);
-  const [notice, setNotice] = useState("Explore the forest village");
+  const [notice, setNotice] = useState("Explore the kingdom of Lanka");
   const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
@@ -87,7 +87,7 @@ export default function App() {
 
       <div className="vignette" aria-hidden="true" />
       <header className="topbar">
-        <div className="brand"><div className="brand-symbol">✦</div><div><strong>SL RAVAN</strong><small>THE FIRST JOURNEY</small></div></div>
+        <div className="brand"><div className="brand-symbol">✦</div><div><strong>SL RAVAN</strong><small>THE FORGOTTEN KINGDOM</small></div></div>
         <div className="topbar-right">
           <span className="prototype-tag">EXPLORATION PROTOTYPE</span>
           <span className="fps"><span className="status-dot" /> {stats.fps} FPS</span>
@@ -100,13 +100,13 @@ export default function App() {
           <section className="location-label" aria-live="polite">
             <div className="eyebrow">NOW EXPLORING</div>
             <h2>{stats.location}</h2>
-            <span>✧ A world waiting to be discovered</span>
+            <span>✧ An ancient kingdom awaits</span>
           </section>
           <div className="crosshair" aria-hidden="true">·</div>
           <aside className="objective-card">
             <div className="eyebrow">JOURNEY 001 <span className="eyebrow-separator">/</span> FREE EXPLORE</div>
             <h3>{notice}</h3>
-            <div className="objective-foot"><span className="diamond">◇</span> Find the glowing shrine</div>
+            <div className="objective-foot"><span className="diamond">◇</span> Seek the ancient stone sanctuary</div>
           </aside>
           <div className="interaction" role="status" aria-live="polite">
             {stats.nearby && <><kbd>E</kbd> {stats.nearby}</>}
@@ -132,14 +132,14 @@ export default function App() {
             <div className="overline">AN OPEN WORLD IS BEGINNING</div>
             <h1>SL <em>RAVAN</em></h1>
             <div className="divider"><span>◆</span></div>
-            <p>Beyond the ancient trees, a forgotten world awaits. Take your first steps through a living forest village.</p>
+            <p>Beyond the ancient trees lies a forgotten kingdom. Explore its royal stone gateway, overgrown sanctuaries and tropical forest paths.</p>
             <p className="demo-note">A playable environment test. The Ravana-inspired story comes later.</p>
             {error && <p className="error" role="alert">{error}</p>}
             {showHelp && <p className="help">Move with WASD or arrows. Hold Shift to sprint. Press Space to jump, E to interact, drag to orbit the camera, and Esc to pause. Progress is saved in this browser.</p>}
             <button className="primary-button" onClick={paused && started ? resume : start} disabled={!ready || Boolean(error)}>
               {error ? "GRAPHICS UNAVAILABLE" : !ready ? "PREPARING THE WORLD…" : started ? "CONTINUE JOURNEY" : "ENTER THE WORLD"} <span>↗</span>
             </button>
-            <div className="menu-bottom"><span>CHAPTER ZERO · PROTOTYPE</span><span>DESKTOP BROWSER</span></div>
+            <div className="menu-bottom"><span>ANCIENT LANKA · PROTOTYPE</span><span>DESKTOP BROWSER</span></div>
           </section>
         </div>
       )}

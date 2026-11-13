@@ -44,7 +44,8 @@ export class RavanGame {
     this.scene = new Scene(this.engine);
     this.scene.clearColor = new Color4(.69, .79, .75, 1);
     this.scene.fogMode = Scene.FOGMODE_EXP2;
-    this.scene.fogDensity = .0064;
+    this.scene.fogDensity = .0048;
+    this.scene.imageProcessingConfiguration.contrast = 1.16;
     this.scene.fogColor = new Color3(.69, .79, .75);
     this.ambient = new HemisphericLight("sky-ambient", new Vector3(0, 1, 0), this.scene);
     this.ambient.intensity = .95;
@@ -53,9 +54,9 @@ export class RavanGame {
     this.sun.position.set(35, 75, -35);
     this.sun.intensity = 2.3;
     this.sun.diffuse = new Color3(1, .91, .73);
-    const shadows = new ShadowGenerator(1024, this.sun);
+    const shadows = new ShadowGenerator(512, this.sun);
     shadows.useBlurExponentialShadowMap = true;
-    shadows.blurKernel = 20;
+    shadows.blurKernel = 12;
 
     this.world = createForestVillage(this.scene, shadows);
     this.player = createPlayer(this.scene, shadows);
@@ -181,7 +182,7 @@ export class RavanGame {
       this.callbacks.onStats({
         fps: Math.round(this.engine.getFps()),
         position: { x: p.x, z: p.z },
-        location: p.z > 48 ? "The Elder Grove" : p.z > 0 ? "Whisperwood Village" : "The Verdant Approach",
+        location: p.z > 78 ? "The Royal Sanctuary" : p.z > 0 ? "Lanka Forest Settlement" : "The Ancient Forest",
         nearby: nearest ? "Interact · " + nearest.label : null,
       });
     }
