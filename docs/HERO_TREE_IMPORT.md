@@ -75,3 +75,18 @@ The downloader uses the public Poly Haven files API for jacaranda_tree, chooses 
 **Important:** The actual remote API response/download has not been tested in this assistant environment. If a file variant is unavailable or is too large for the 90 MiB guard, the command fails with an error rather than silently replacing it with placeholder artwork. The model is still candidate-only and does not automatically appear in the game.
 
 After visual review, export a smaller self-contained GLB from Blender and install it with npm run art:install-tree. If it exceeds the 600K triangle guard, decimate or use an appropriate LOD. Record the source, final asset hash and performance before changing its manifest status.
+
+## Reproducible candidate-to-GLB conversion (Blender)
+
+After a successful Poly Haven candidate download, install Blender 4.x, confirm the `blender` executable is on your PATH (or set `BLENDER_BIN` to its full path) and run:
+
+~~~powershell
+npm run art:fetch-candidate
+$env:BLENDER_BIN = 'C:\Program Files\Blender Foundation\Blender 4.5\blender.exe' # change to actual install path if needed
+npm run art:prepare-candidate
+npm run dev
+~~~
+
+The conversion uses Blender's glTF importer/exporter in headless mode, preserves the material textures, checks triangle count, exports a single GLB, verifies the exported GLB has embedded images/materials, and writes a SHA-256 provenance record. It refuses unapproved sources and never promotes a placeholder tree to production. The conversion does not automatically change manifest approval gates. A valid asset may still be too costly or look wrong at runtime; inspect it in `/?artlab`, compare FPS and inspect in-game before approval.
+
+Blender is not installed in this assistant environment and the Poly Haven download server is inaccessible here, so conversion and appearance still require your local validation. The actual Blender installation path in the example is only illustrative.
