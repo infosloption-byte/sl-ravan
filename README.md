@@ -142,3 +142,7 @@ Run npm run art:fetch-candidate to retrieve the CC0 Poly Haven Jacaranda 1K glTF
 ### Preparing downloaded hero tree
 
 After `npm run art:fetch-candidate`, optionally run `npm run art:prepare-candidate` (requires Blender 4.x installed and on PATH, or set BLENDER_BIN to its executable). This exports one self-contained, optimized-to-first-budget GLB from the downloaded glTF, validates it and copies it into the game's optional hero-tree slot. It records source/sha256 but does not mark visual approval. See `docs/HERO_TREE_IMPORT.md`.
+
+### Poly Haven 1K package larger than 90 MiB
+
+The source downloader now examines the **actual glTF buffer and image references**, rather than rejecting all files listed by the API. First run `npm run art:candidate-size` to inspect metadata without downloading. Then run `npm run art:fetch-candidate`. If the required dependencies remain too large, it reports their sizes and offers an explicitly bounded `npm run art:fetch-candidate -- --max-mib=256` option for local Blender conversion only (absolute cap 512 MiB). This does not relax the final browser GLB/performance budgets. Download and conversion remain unverified until run locally.
