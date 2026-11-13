@@ -90,3 +90,29 @@ npm run dev
 The conversion uses Blender's glTF importer/exporter in headless mode, preserves the material textures, checks triangle count, exports a single GLB, verifies the exported GLB has embedded images/materials, and writes a SHA-256 provenance record. It refuses unapproved sources and never promotes a placeholder tree to production. The conversion does not automatically change manifest approval gates. A valid asset may still be too costly or look wrong at runtime; inspect it in `/?artlab`, compare FPS and inspect in-game before approval.
 
 Blender is not installed in this assistant environment and the Poly Haven download server is inaccessible here, so conversion and appearance still require your local validation. The actual Blender installation path in the example is only illustrative.
+
+## Oversized Jacaranda metadata: download fix
+
+The initial run on Windows rejected the Jacaranda 1K glTF because the API's **entire dependency list** exceeded 90 MiB. That is not necessarily the size of the textures and buffers the selected glTF actually uses.
+
+The downloader now fetches the glTF manifest first and selects only files referenced in its buffers and images. It retains Poly Haven HTTPS host checks, safe relative file paths, size limits, MD5 verification, guarded streaming and a source provenance receipt.
+
+To inspect the API's declared files **without downloading anything**:
+
+```powershell
+npm run art:candidate-size
+```
+
+To download the smaller referenced subset under the normal 90 MiB cap:
+
+```powershell
+npm run art:fetch-candidate
+```
+
+If the actual referenced source files **still** exceed 90 MiB, the command prints the required amount and largest files. An explicit higher cap for temporary Blender source preparation is allowed:
+
+```powershell
+npm run art:fetch-candidate -- --max-mib=256
+```
+
+Maximum permitted temporary source budget: 512 MiB. This does **not** change browser asset requirements. The final optimized tree must still satisfy the smaller GLB import checks and performance/visual review. Do not automatically expand the source budget; choose a smaller LOD or alternative model if the source is excessively large. Node.js 24's native Windows shutdown assertion following the old unhandled rejection has not been independently diagnosed; the CLI now catches normal download errors rather than leaving them unhandled.
