@@ -58,3 +58,20 @@ If the model looks good, return to the game at http://127.0.0.1:5186/ and check 
 - [ ] Gameplay, 24 baseline tests and additional asset tests pass.
 
 **Do not call Gate A complete on the basis of a successful GLB import alone.**
+
+## Optional direct Poly Haven candidate download
+
+You can preview the real Jacaranda glTF source without first converting it to GLB:
+
+~~~powershell
+npm run art:fetch-candidate
+npm run dev
+~~~
+
+Open http://127.0.0.1:5186/?artlab and choose **Poly Haven Jacaranda candidate**.
+
+The downloader uses the public Poly Haven files API for jacaranda_tree, chooses the 1K glTF variant and downloads its referenced textures and binary dependencies. It verifies declared file sizes, supplied MD5 hashes, safe relative paths and allowed Poly Haven source hosts. The candidate lives in public/assets/visual-slice/candidates/jacaranda and is ignored by Git.
+
+**Important:** The actual remote API response/download has not been tested in this assistant environment. If a file variant is unavailable or is too large for the 90 MiB guard, the command fails with an error rather than silently replacing it with placeholder artwork. The model is still candidate-only and does not automatically appear in the game.
+
+After visual review, export a smaller self-contained GLB from Blender and install it with npm run art:install-tree. If it exceeds the 600K triangle guard, decimate or use an appropriate LOD. Record the source, final asset hash and performance before changing its manifest status.

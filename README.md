@@ -134,3 +134,7 @@ This commit is a plan and validation scaffold: it does NOT include new high-reso
 New: a standalone [Art Lab](?artlab) for orbiting and inspecting local or installed GLB assets without affecting gameplay. Use the browser route `/?artlab`. The main game loads an optional licensed hero-tree GLB from `public/assets/visual-slice/vegetation/hero-tree.glb` and safely falls back to procedural art if absent.
 
 The installed hero-tree must pass structural/texture/triangle checks and have a source/rights record. See [docs/HERO_TREE_IMPORT.md](docs/HERO_TREE_IMPORT.md). `npm run test:asset-quality` adds four Node unit tests to the existing 24 baseline tests. The **realistic source asset has not been installed** by this commit; the current in-game graphics will look the same until a verified detailed model is imported.
+
+### Optional detailed tree preview
+
+Run npm run art:fetch-candidate to retrieve the CC0 Poly Haven Jacaranda 1K glTF and texture dependencies for Art Lab preview only (90 MiB download cap). Then visit /?artlab and choose Poly Haven Jacaranda candidate. A downloaded model is not yet approved or loaded into the game. See docs/HERO_TREE_IMPORT.md for optimization and promotion instructions.
