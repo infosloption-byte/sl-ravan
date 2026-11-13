@@ -1,60 +1,125 @@
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { createWriteStream, createReadStream } from "node:fs";
 import { createHash } from "node:crypto";
 import { pipeline } from "node:stream/promises";
-import { Readable } from "node:stream";
-import { dirname, resolve } from "node:path";
+import { Readable, Transform } from "node:stream";
+import { dirname, resolve, sep } from "node:path";
 import {
-  MODEL_ID, MAX_CANDIDATE_BYTES, selectPolyHavenGltf, validateGltfDependencies
+  MODEL_ID, MAX_CANDIDATE_BYTES, selectPolyHavenGltf,
+  selectRequiredGltfFiles, validateGltfDependencies
 } from "./polyhaven-candidate.mjs";
 
 const api = "https://api.polyhaven.com/files/" + MODEL_ID;
 const output = resolve(process.cwd(), "public/assets/visual-slice/candidates/jacaranda");
-const request = await fetch(api, { headers: { "User-Agent": "SL-Ravan-ArtLab/0.1" } });
-if (!request.ok) throw Error("Poly Haven API unavailable: HTTP " + request.status);
-const metadata = await request.json();
-const selected = selectPolyHavenGltf(metadata);
-console.log("Poly Haven glTF candidate:", MODEL_ID, selected.resolution);
-console.log("Declared source download:", (selected.declaredBytes/1024/1024).toFixed(1), "MiB");
+const mb = n => (n / 1048576).toFixed(1) + " MiB";
 
-await mkdir(output, { recursive: true });
-let bytes = 0;
-const inventory = [];
-for (const item of selected.items) {
-  const destination = resolve(output, item.path);
-  if (!destination.startsWith(output + "/") && !destination.startsWith(output + "\\"))
-    throw Error("Unsafe destination path");
-  await mkdir(dirname(destination), { recursive: true });
-  const downloaded = await fetch(item.url);
-  if (!downloaded.ok || !downloaded.body) throw Error("Download failed: " + item.path);
-  const announced = Number(downloaded.headers.get("content-length"));
-  if (Number.isFinite(announced) && announced > item.size * 1.1)
-    throw Error("Unexpected download size: " + item.path);
-  await pipeline(Readable.fromWeb(downloaded.body), createWriteStream(destination));
-  const fileSize = (await stat(destination)).size;
-  bytes += fileSize;
-  if (bytes > MAX_CANDIDATE_BYTES) throw Error("Candidate exceeded 90 MiB while downloading");
-  const md5 = createHash("md5");
-  for await (const chunk of createReadStream(destination)) md5.update(chunk);
-  const hash = md5.digest("hex");
-  if (item.md5 && hash.toLowerCase() !== item.md5.toLowerCase())
-    throw Error("Poly Haven MD5 mismatch for: " + item.path);
-  inventory.push({file: item.path, bytes: fileSize, md5: hash});
-  console.log("Downloaded", item.path, (fileSize/1024/1024).toFixed(2), "MiB");
+function budgetFromArgs(args) {
+  const opt = args.find(v => v.startsWith("--max-mib="));
+  if (!opt) return MAX_CANDIDATE_BYTES;
+  const n = Number(opt.substring("--max-mib=".length));
+  if (!Number.isSafeInteger(n) || n < 1 || n > 512)
+    throw Error("--max-mib must be an integer between 1 and 512");
+  return n * 1048576;
 }
 
-const gltf = await readFile(resolve(output, "model.gltf"), "utf8");
-const report = validateGltfDependencies(gltf, new Set(inventory.map(x => x.file)));
-await writeFile(resolve(output, "source.provenance.json"), JSON.stringify({
-  source: "https://polyhaven.com/a/" + MODEL_ID,
-  license: "CC0-1.0",
-  sourceAPI: api,
-  resolution: selected.resolution,
-  author: "Rico Cilliers (Poly Haven)",
-  downloadedAt: new Date().toISOString(),
-  status: "candidate-preview-only-not-game-approved",
-  model: report,
-  files: inventory
-}, null, 2) + "\n");
-console.log("Candidate ready for inspection only. Open /?artlab and select Poly Haven Jacaranda.");
-console.log("This source is NOT yet an optimized/approved in-game hero tree.");
+async function download(item, destination, remaining) {
+  if (item.size > remaining) throw Error("Download would exceed source budget: " + item.path);
+  const temp = destination + ".partial";
+  await rm(temp, {force: true});
+  try {
+    const response = await fetch(item.url);
+    if (!response.ok || !response.body)
+      throw Error("Could not download " + item.path + ": HTTP " + response.status);
+    let size = 0;
+    const md5 = createHash("md5");
+    const guard = new Transform({
+      transform(chunk, _encoding, done) {
+        size += chunk.length;
+        if (size > remaining || size > item.size * 1.1) {
+          done(Error("Actual download exceeded source budget for " + item.path));
+          return;
+        }
+        md5.update(chunk);
+        done(null, chunk);
+      }
+    });
+    await pipeline(Readable.fromWeb(response.body), guard, createWriteStream(temp));
+    if (size !== item.size)
+      throw Error("Unexpected file size for " + item.path + ": expected " + item.size + ", got " + size);
+    if (item.md5 && md5.digest("hex").toLowerCase() !== item.md5.toLowerCase())
+      throw Error("Poly Haven checksum mismatch: " + item.path);
+    await rm(destination,{force:true});
+    await rename(temp, destination);
+    console.log("Downloaded", item.path, mb(size));
+    return size;
+  } finally {
+    await rm(temp,{force:true});
+  }
+}
+async function record(path, name) {
+  const md5 = createHash("md5");
+  for await (const chunk of createReadStream(path)) md5.update(chunk);
+  return {file:name, bytes:(await stat(path)).size, md5:md5.digest("hex")};
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const maxBytes = budgetFromArgs(args);
+  const metadataOnly = args.includes("--inspect");
+  const response = await fetch(api, { headers: { "User-Agent": "SL-Ravan-ArtLab/0.2" } });
+  if (!response.ok) throw Error("Poly Haven API unavailable: HTTP " + response.status);
+  const selected = selectPolyHavenGltf(await response.json());
+  console.log("Poly Haven", MODEL_ID, "glTF", selected.resolution);
+  console.log("All API-listed files:", mb(selected.declaredBytes));
+  console.log("Largest listed files:");
+  for (const item of selected.items.slice().sort((a,b)=>b.size-a.size).slice(0,8))
+    console.log("  " + mb(item.size) + "  " + item.path);
+  console.log("Source download limit:", mb(maxBytes));
+
+  if (metadataOnly) {
+    console.log("INSPECT ONLY: nothing downloaded. The glTF may reference fewer files than listed.");
+    return;
+  }
+  const primary = selected.items[0];
+  if (primary.size > maxBytes)
+    throw Error("The primary glTF alone exceeds " + mb(maxBytes) +
+      ". Consider a lighter asset or explicitly increase --max-mib after inspecting sizes.");
+  await mkdir(output,{recursive:true});
+  // A previous completed receipt must never represent an incomplete new attempt.
+  await rm(resolve(output,"source.provenance.json"),{force:true});
+  const sourcePath = resolve(output, "model.gltf");
+  await download(primary,sourcePath,maxBytes);
+  const gltf=await readFile(sourcePath,"utf8");
+  const required=selectRequiredGltfFiles(selected,gltf,maxBytes);
+  console.log("Actual referenced source files:",required.items.length,
+    "| unreferenced API entries skipped:",required.skipped);
+  console.log("Estimated download for required files:",mb(required.declaredBytes));
+  let transferred = (await stat(sourcePath)).size;
+  const inventory = [await record(sourcePath, "model.gltf")];
+  for (const item of required.items.slice(1)) {
+    const dest=resolve(output,item.path);
+    if (!dest.startsWith(output+sep)) throw Error("Unsafe target path: "+item.path);
+    await mkdir(dirname(dest),{recursive:true});
+    transferred+=await download(item,dest,maxBytes-transferred);
+    inventory.push(await record(dest,item.path));
+  }
+  const report=validateGltfDependencies(gltf,new Set(inventory.map(item=>item.file)));
+  await writeFile(resolve(output,"source.provenance.json"),JSON.stringify({
+    source:"https://polyhaven.com/a/"+MODEL_ID,
+    license:"CC0-1.0",sourceAPI:api,
+    resolution:selected.resolution,author:"Rico Cilliers (Poly Haven)",
+    downloadedAt:new Date().toISOString(),
+    status:"candidate-preview-only-not-game-approved",
+    model:report,files:inventory
+  },null,2)+"\n");
+  console.log("PASS: verified",inventory.length,"files ("+mb(transferred)+").");
+  console.log("Open /?artlab to inspect; raw source is NOT approved for the game.");
+}
+
+main().catch(error => {
+  // Handle a normal size rejection without an unhandled top-level exception.
+  console.error("SL Ravan Poly Haven candidate was not downloaded:");
+  console.error(error instanceof Error ? error.message : String(error));
+  console.error("Use npm run art:candidate-size to inspect API metadata.");
+  process.exitCode = 1;
+});
