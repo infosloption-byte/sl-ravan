@@ -5,6 +5,7 @@ import {
 } from "@babylonjs/core";
 import { createLankaTheme } from "./LankaTheme";
 import { packInstanceMatrices } from "./InstanceMatrices";
+import { createForestSurfaceMaterial } from "./ForestSurface";
 
 /**
  * First environment concept: a dense, sunlit forest village.
@@ -90,6 +91,7 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
     .map((hex, i) => material(scene, "understory-" + i, hex));
   const canopyTransforms: Matrix[][] = leafMaterials.map(() => []);
   const trunkTransforms: Matrix[][] = [[], []];
+  const rockTransforms: Matrix[][] = [[], []];
   const lantern = material(scene, "warm-lantern", "#fff2b6", { emissive: "#eebc69" });
   const shrineLight = material(scene, "ancient-arcane", "#72d6d3", { emissive: "#2fb6ae" });
   const cloth = material(scene, "ribbon-fabric", "#a6c7b2", { alpha: .9 });
@@ -122,19 +124,18 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
     land.updateVerticesData(VertexBuffer.NormalKind, normals);
     land.setVerticesData(VertexBuffer.ColorKind, colors);
   }
-  const groundMat = material(scene, "land-with-vertex-colors", "#ffffff");
-  groundMat.diffuseColor = Color3.White();
+  const groundMat = createForestSurfaceMaterial(scene);
   land.material = groundMat;
   land.receiveShadows = true;
 
   function stoneAt(x: number, z: number, size: number) {
     const y = groundHeight(x, z);
-    const rock = MeshBuilder.CreateIcoSphere("forest-boulder", { radius: 1, subdivisions: 1 }, scene);
-    rock.position.set(x, y + size * .24, z);
-    rock.scaling.set(size * 1.3, size * .65, size * 1.1);
-    rock.rotation.set(random() * .32, random() * Math.PI, random() * .24);
-    rock.material = random() > .45 ? stone : stoneDark;
-    rock.receiveShadows = true;
+    const kind = random() > .45 ? 0 : 1;
+    rockTransforms[kind].push(Matrix.Compose(
+      new Vector3(size * 1.3, size * .65, size * 1.1),
+      Quaternion.FromEulerAngles(random() * .32, random() * Math.PI, random() * .24),
+      new Vector3(x, y + size * .24, z)
+    ));
   }
 
   // The large tree silhouettes are deliberate: the reference is all about
@@ -354,6 +355,18 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
     const x = pathCenter(z) + (random() > .5 ? 1 : -1) * randomBetween(4.1, 7.8);
     stoneAt(x, z, randomBetween(.14, .65));
   }
+
+  // Draw scattered rocks in two material groups instead of issuing a draw
+  // for every boulder. The old geometry and placement remain unchanged.
+  rockTransforms.forEach((transforms, i) => {
+    const rock = MeshBuilder.CreateIcoSphere("forest-rocks-instanced-" + i, {
+      radius: 1, subdivisions: 1
+    }, scene);
+    rock.material = i === 0 ? stone : stoneDark;
+    rock.receiveShadows = true;
+    rock.thinInstanceSetBuffer("matrix", packInstanceMatrices(transforms), 16, true);
+    rock.thinInstanceRefreshBoundingInfo();
+  });
 
   // A soft warm lantern rhythm makes the forest path readable at dusk.
   function lightPost(x: number, z: number) {

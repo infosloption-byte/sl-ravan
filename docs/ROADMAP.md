@@ -80,3 +80,12 @@ Blender (.blend source) → validated glTF/GLB → texture compression / mesh op
 After converting foliage to thin instances, canopies and fern fronds disappeared. The root cause was wrapping `transforms.flatMap(m => m.asArray())` in a `Float32Array`. Typed arrays are not flattened by JavaScript `flatMap`, so each resulting element was coerced to NaN. A typed-array packer and three regression tests now cover this bug. The fix must be visually checked before the milestone is merged.
 
 The next art-production stage requires original detailed GLB characters, tree leaves, rocks and architectural meshes, and PBR material authoring. Procedural meshes are still only blockout assets.
+
+## Milestone 3 — Terrain finish and art readiness
+
+- [x] Layer a small repeated color-grain texture over the existing vertex-colored grass and dirt surface.
+- [x] Batch static decorative stones into two Babylon thin-instance draw groups.
+- [x] Document concrete GLB/PBR asset production, licensing and budgets in `docs/ART_ASSETS.md`.
+- [ ] Build and import the first authored Blender hero tree and temple module.
+- [ ] Optimize Babylon runtime bundle by measuring narrower import boundaries.
+- [ ] Recheck player camera, new texture appearance and full-scene FPS on desktop.

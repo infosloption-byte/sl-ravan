@@ -82,3 +82,7 @@ See docs/ROADMAP.md for the staged plan and quality acceptance checklist.
 - Tree trunks are now also rendered in two instanced batches rather than many individual meshes. Actual GPU performance must be measured on a local machine.
 - The React launcher dynamically imports the Babylon game module. This splits the large game module away from the initial UI bundle; it does not reduce the total engine download.
 - Vitest is upgraded to 5.1.0 to address audited vulnerabilities in older mocker/tinypool dependencies. Node.js 22.12 or later is required. Reinstall, rerun `npm audit` and check tests after the major-version change.
+
+## Milestone 3 direction
+
+The first graphics improvement after the restored tree canopy adds a subtle repeated ground microtexture and batches scattered rocks by material for fewer draw calls. The rest of the scene remains unchanged to keep the now-passing gameplay stable. For the actual high-fidelity Ravana-inspired environment, see [the authored-asset production plan](docs/ART_ASSETS.md).
