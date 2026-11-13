@@ -94,3 +94,5 @@ Running npm run dev or npm run build now regenerates two reproducible glTF 2.0 b
 The models are imported asynchronously through @babylonjs/loaders after the procedural world starts. If they fail to load, the existing playable environment remains. The rain tree appears near the starting trail and in the village; the authored stone pavilion appears beside the royal gateway.
 
 Use npm run assets:generate to regenerate these original models and npm run test:art to validate their glTF headers/accessors. npm test runs existing gameplay tests plus new art tests. These models are higher-detail stylized source assets, not photorealistic AAA art.
+
+For prototype verification, the FPS indicator also shows GLB 0/2 to 2/2. After the scene loads, GLB 2/2 confirms both original models are active; GLB 0/2 or 1/2 indicates missing assets or a loader error. Check the browser console for details. This development indicator is not intended for the final game UI.

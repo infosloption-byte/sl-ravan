@@ -3,6 +3,7 @@ import type { RavanGame, GameStats } from "./game/RavanGame";
 
 const initialStats: GameStats = {
   fps: 0,
+  artModels: 0,
   position: { x: 0, z: 0 },
   location: "The Ancient Forest",
   nearby: null,
@@ -99,7 +100,7 @@ export default function App() {
         <div className="brand"><div className="brand-symbol">✦</div><div><strong>SL RAVAN</strong><small>THE FORGOTTEN KINGDOM</small></div></div>
         <div className="topbar-right">
           <span className="prototype-tag">EXPLORATION PROTOTYPE</span>
-          <span className="fps"><span className="status-dot" /> {stats.fps} FPS</span>
+          <span className="fps"><span className="status-dot" /> {stats.fps} FPS · GLB {stats.artModels}/2</span>
           {started && <button className="icon-button" aria-label="Pause game" onClick={pause}>Ⅱ</button>}
         </div>
       </header>

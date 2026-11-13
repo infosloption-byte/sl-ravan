@@ -19,7 +19,8 @@ export async function loadOriginalGameArt(
   scene: Scene,
   shadows: ShadowGenerator,
   world: ForestVillage
-): Promise<void> {
+): Promise<number> {
+  let loaded = 0;
   await import("@babylonjs/loaders/glTF/2.0");
 
   try {
@@ -32,6 +33,7 @@ export async function loadOriginalGameArt(
         shadows.addShadowCaster(mesh);
       }
     }
+    loaded++;
     const clone = tree.root.instantiateHierarchy();
     if (clone) {
       clone.position.set(25, groundHeight(25, 24), 24);
@@ -52,7 +54,9 @@ export async function loadOriginalGameArt(
       }
     }
     world.addBlocker(x, z, 5.3, 5.3);
+    loaded++;
   } catch (error) {
     console.warn("SL Ravan: pavilion GLB unavailable; retaining original ruins", error);
   }
+  return loaded;
 }

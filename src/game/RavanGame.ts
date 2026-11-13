@@ -12,6 +12,7 @@ export interface GameStats {
   position: { x: number; z: number };
   location: string;
   nearby: string | null;
+  artModels: number;
 }
 interface GameCallbacks {
   onReady: () => void;
@@ -32,6 +33,7 @@ export class RavanGame {
   private paused = true;
   private night = false;
   private shrineFound = false;
+  private artModels = 0;
   private jumpVelocity = 0;
   private heightOffset = 0;
   private animationTime = 0;
@@ -61,9 +63,11 @@ export class RavanGame {
 
     this.world = createForestVillage(this.scene, shadows);
     // Optional original GLB models load after the procedural scene is ready.
-    void loadOriginalGameArt(this.scene, shadows, this.world).catch((error: unknown) => {
-      console.warn("SL Ravan: optional authored game art could not be loaded", error);
-    });
+    void loadOriginalGameArt(this.scene, shadows, this.world)
+      .then((count) => { if (!this.disposed) this.artModels = count; })
+      .catch((error: unknown) => {
+        console.warn("SL Ravan: optional authored game art could not be loaded", error);
+      });
     this.player = createPlayer(this.scene, shadows);
     this.camera = new ArcRotateCamera("third-person", -Math.PI / 2, 1.14, 12, new Vector3(0, 1.5, -45), this.scene);
     this.camera.lowerRadiusLimit = 5;
@@ -186,6 +190,7 @@ export class RavanGame {
       const nearest = this.world.nearestInteraction(p, 3.6);
       this.callbacks.onStats({
         fps: Math.round(this.engine.getFps()),
+        artModels: this.artModels,
         position: { x: p.x, z: p.z },
         location: p.z > 78 ? "The Royal Sanctuary" : p.z > 0 ? "Lanka Forest Settlement" : "The Ancient Forest",
         nearby: nearest ? "Interact · " + nearest.label : null,
