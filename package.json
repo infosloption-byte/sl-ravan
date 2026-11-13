@@ -8,14 +8,15 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "vitest run && npm run test:art",
+    "test": "npm run test:unit && npm run test:art",
     "dev:lan": "vite --host 0.0.0.0",
     "audit": "npm audit",
     "audit:prod": "npm audit --omit=dev",
     "predev": "npm run assets:generate",
     "prebuild": "npm run assets:generate",
     "assets:generate": "node scripts/generate-art.mjs",
-    "test:art": "node --test scripts/generate-art.test.mjs"
+    "test:art": "node --test scripts/generate-art.test.mjs",
+    "test:unit": "vitest run src"
   },
   "dependencies": {
     "@babylonjs/core": "^8.0.0",
