@@ -128,3 +128,9 @@ Before touching rendering code, confirm the current draft PR #1 branch starts in
 Run npm run plan:validate to check scene-manifest consistency, and npm run test:plan to execute four Node-native manifest tests. npm test includes the plan checks alongside existing gameplay and GLB tests.
 
 This commit is a plan and validation scaffold: it does NOT include new high-resolution assets or a realistic scene yet.
+
+## Forest village — real asset integration (Gate A)
+
+New: a standalone [Art Lab](?artlab) for orbiting and inspecting local or installed GLB assets without affecting gameplay. Use the browser route `/?artlab`. The main game loads an optional licensed hero-tree GLB from `public/assets/visual-slice/vegetation/hero-tree.glb` and safely falls back to procedural art if absent.
+
+The installed hero-tree must pass structural/texture/triangle checks and have a source/rights record. See [docs/HERO_TREE_IMPORT.md](docs/HERO_TREE_IMPORT.md). `npm run test:asset-quality` adds four Node unit tests to the existing 24 baseline tests. The **realistic source asset has not been installed** by this commit; the current in-game graphics will look the same until a verified detailed model is imported.

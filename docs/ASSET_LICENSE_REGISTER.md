@@ -21,3 +21,7 @@ Confirm the license and download rights of every specific file before adding it.
 | hero-character-v1 | Not sourced | TBD | TBD | TBD | TBD | TBD | No |
 
 Rules: original/CC0/properly licensed game-distributable models only. Keep editable sources and records. Validate units, pivots, normals, UVs, material channels, animations, LODs and texture compression before integration.
+
+## First candidate under evaluation — not yet imported
+
+Candidate: Poly Haven [Jacaranda Tree](https://polyhaven.com/a/jacaranda_tree), Rico Cilliers / Rob Tuytel. Poly Haven public asset license: [CC0](https://polyhaven.com/license). The model page indicates a broad canopy and approximately 312K triangles, though exported variant and final browser size have not been validated. **Status: candidate only — NOT installed, reviewed, optimized, or approved.** A local user download/export must be checked before the asset register can transition from `Not sourced`.

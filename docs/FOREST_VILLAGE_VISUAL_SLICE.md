@@ -121,3 +121,7 @@ Source -> Blender/approved model -> validated glTF/GLB -> optimized texture/mode
 ## GitHub integration
 
 Planning is on a NEW stacked branch based on draft PR #1. Do not merge to main, and do not mark visual work as implemented until actual screenshots prove it.
+
+## Art Lab integration checkpoint (implementation started)
+
+The art-preview infrastructure is now present behind `/?artlab`, with a local GLB file picker and a game runtime hook for the optional `hero-tree.glb`. The source asset itself is **still pending**. Gate A cannot be marked complete until a real high-detail tree is acquired/produced, inspected, budgeted, and approved in the actual game. See `docs/HERO_TREE_IMPORT.md`.
