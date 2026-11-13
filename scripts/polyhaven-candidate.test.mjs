@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import { strict as assert } from "node:assert";
 import {
-  safeRelativeAssetPath, selectPolyHavenGltf, validateGltfDependencies
+  safeRelativeAssetPath, selectPolyHavenGltf, selectRequiredGltfFiles, validateGltfDependencies
 } from "./polyhaven-candidate.mjs";
 
 const source = {gltf: {"1k": {gltf: {
@@ -29,6 +29,43 @@ describe("Poly Haven candidate planner",()=>{
     const fake=structuredClone(source);
     fake.gltf["1k"].gltf.url="https://untrusted.invalid/malware";
     assert.throws(()=>selectPolyHavenGltf(fake),/non-Poly-Haven/);
+  });
+  it("does not mistake unused heavyweight API textures for required files",()=>{
+    const metadata=structuredClone(source);
+    metadata.gltf["1k"].gltf.include["textures/unused.exr"]={
+      url:"https://dl.polyhaven.org/tree/unused.exr",size:120*1024*1024
+    };
+    const selected=selectPolyHavenGltf(metadata);
+    assert.ok(selected.declaredBytes>90*1024*1024);
+    const model=JSON.stringify({
+      asset:{version:"2.0"},
+      buffers:[{uri:"tree.bin"}],images:[{uri:"textures/leaves.jpg"}]
+    });
+    const actual=selectRequiredGltfFiles(selected,model);
+    assert.equal(actual.items.length,3);
+    assert.equal(actual.declaredBytes,6000);
+    assert.equal(actual.skipped,1);
+  });
+  it("rejects only genuinely oversized dependencies and explains the source budget",()=>{
+    const selected=selectPolyHavenGltf(source);
+    const model=JSON.stringify({asset:{version:"2.0"},buffers:[{uri:"tree.bin"}]});
+    assert.throws(()=>selectRequiredGltfFiles(selected,model,2000),/Required Jacaranda files total/);
+    assert.equal(selectRequiredGltfFiles(selected,model,10000).items.length,2);
+  });
+  it("rejects external glTF texture URLs and mismatched API metadata",()=>{
+    const selected=selectPolyHavenGltf(source);
+    assert.throws(()=>selectRequiredGltfFiles(selected,JSON.stringify({
+      asset:{version:"2.0"},images:[{uri:"https://evil.invalid/a.jpg"}]
+    })),/External URLs/);
+    assert.throws(()=>selectRequiredGltfFiles(selected,JSON.stringify({
+      asset:{version:"2.0"},images:[{uri:"missing.jpg"}]
+    })),/no referenced dependency/);
+  });
+  it("requires an explicit bounded source allowance",()=>{
+    const selected=selectPolyHavenGltf(source);
+    const model=JSON.stringify({asset:{version:"2.0"}});
+    assert.throws(()=>selectRequiredGltfFiles(selected,model,1024*1024*1024),/512 MiB/);
+    assert.equal(selectRequiredGltfFiles(selected,model).items.length,1);
   });
   it("validates referenced glTF texture and binary dependencies",()=>{
     const file=JSON.stringify({asset:{version:"2.0"},meshes:[{}],images:[{uri:"textures/leaves.jpg"}],buffers:[{uri:"tree.bin"}]});
