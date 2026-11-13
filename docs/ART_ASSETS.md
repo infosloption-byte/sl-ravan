@@ -47,3 +47,7 @@ Use **Blender** for geometry and animation, and export individual .glb modules. 
 ## Next implementation milestone
 
 Produce **one fully authored hero tree GLB** and **one authentic fantasy stone temple module** in Blender, import them with an explicit asset manifest and fallback behavior, and compare visual quality/FPS against the procedural baseline. Then replace other procedural assets progressively.
+
+## First reproducible original GLB asset pipeline
+
+The repository now contains scripts/generate-art.mjs, a Node-only original asset authoring script that writes genuine binary glTF 2.0 models with indexed triangles, normal vectors and PBR material properties. The generated hero tree and stone pavilion can be inspected in Blender or glTF viewers. They contain no third-party game assets. src/game/GameArtAssets.ts imports them asynchronously and preserves the procedural scene if loading fails. As higher-detail Blender exports become available, they can replace these generated models without rewriting the movement or UI systems.

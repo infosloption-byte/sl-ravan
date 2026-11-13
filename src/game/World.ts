@@ -23,6 +23,7 @@ export interface ForestVillage {
   isBlocked: (x: number, z: number) => boolean;
   nearestInteraction: (position: Vector3, maxDistance: number) => Interaction | null;
   setNight: (night: boolean) => void;
+  addBlocker: (x: number, z: number, rx: number, rz: number) => void;
 }
 
 type RGB = [number, number, number];
@@ -446,6 +447,7 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
   // Lanterns remain visible during daytime, then gain contrast at night.
   let isNight = false;
   return {
+    addBlocker(x, z, rx, rz) { blockers.push({ x, z, rx, rz }); },
     isBlocked(x, z) {
       return blockers.some((b) => Math.abs(x - b.x) < b.rx + .35 && Math.abs(z - b.z) < b.rz + .35);
     },

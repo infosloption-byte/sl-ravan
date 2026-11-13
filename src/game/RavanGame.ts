@@ -5,6 +5,7 @@ import {
 import { LocalSession } from "./LocalSession";
 import { createPlayer, type PlayerAvatar } from "./Player";
 import { createForestVillage, type ForestVillage, groundHeight } from "./World";
+import { loadOriginalGameArt } from "./GameArtAssets";
 
 export interface GameStats {
   fps: number;
@@ -59,6 +60,10 @@ export class RavanGame {
     shadows.blurKernel = 12;
 
     this.world = createForestVillage(this.scene, shadows);
+    // Optional original GLB models load after the procedural scene is ready.
+    void loadOriginalGameArt(this.scene, shadows, this.world).catch((error: unknown) => {
+      console.warn("SL Ravan: optional authored game art could not be loaded", error);
+    });
     this.player = createPlayer(this.scene, shadows);
     this.camera = new ArcRotateCamera("third-person", -Math.PI / 2, 1.14, 12, new Vector3(0, 1.5, -45), this.scene);
     this.camera.lowerRadiusLimit = 5;

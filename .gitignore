@@ -8,3 +8,6 @@ coverage/
 .DS_Store
 *.log
 *.tsbuildinfo
+
+# Locally generated original GLB models (automatically rebuilt)
+public/assets/generated/*.glb

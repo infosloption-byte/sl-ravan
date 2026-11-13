@@ -86,3 +86,11 @@ See docs/ROADMAP.md for the staged plan and quality acceptance checklist.
 ## Milestone 3 direction
 
 The first graphics improvement after the restored tree canopy adds a subtle repeated ground microtexture and batches scattered rocks by material for fewer draw calls. The rest of the scene remains unchanged to keep the now-passing gameplay stable. For the actual high-fidelity Ravana-inspired environment, see [the authored-asset production plan](docs/ART_ASSETS.md).
+
+## Milestone 4: First original GLB models
+
+Running npm run dev or npm run build now regenerates two reproducible glTF 2.0 binary assets: public/assets/generated/heritage-tree.glb and stone-pavilion.glb. Their complete geometry source is scripts/generate-art.mjs, requiring no downloaded 3D model packs. Generated GLBs are git-ignored and rebuilt automatically.
+
+The models are imported asynchronously through @babylonjs/loaders after the procedural world starts. If they fail to load, the existing playable environment remains. The rain tree appears near the starting trail and in the village; the authored stone pavilion appears beside the royal gateway.
+
+Use npm run assets:generate to regenerate these original models and npm run test:art to validate their glTF headers/accessors. npm test runs existing gameplay tests plus new art tests. These models are higher-detail stylized source assets, not photorealistic AAA art.
