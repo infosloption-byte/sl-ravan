@@ -18,13 +18,17 @@ async function importModel(scene: Scene, filename: string) {
 export async function loadOriginalGameArt(
   scene: Scene,
   shadows: ShadowGenerator,
-  world: ForestVillage
+  world: ForestVillage,
+  isActive: () => boolean = () => true
 ): Promise<number> {
   let loaded = 0;
   await import("@babylonjs/loaders/glTF/2.0");
+  // The user may have closed the game while the loader module was fetched.
+  if (!isActive()) return 0;
 
   try {
     const tree = await importModel(scene, "heritage-tree.glb");
+    if (!isActive()) { tree.root.dispose(false, true); return loaded; }
     tree.root.position.set(-22, groundHeight(-22, -30), -30);
     tree.root.scaling.scaleInPlace(1.08);
     for (const mesh of tree.meshes) {
@@ -42,9 +46,11 @@ export async function loadOriginalGameArt(
   } catch (error) {
     console.warn("SL Ravan: tree GLB unavailable; retaining original forest", error);
   }
+  if (!isActive()) return loaded;
 
   try {
     const temple = await importModel(scene, "stone-pavilion.glb");
+    if (!isActive()) { temple.root.dispose(false, true); return loaded; }
     const x = -25, z = 88;
     temple.root.position.set(x, groundHeight(x, z), z);
     for (const mesh of temple.meshes) {

@@ -62,7 +62,7 @@ export class RavanGame {
 
     this.world = createForestVillage(this.scene, shadows);
     // Optional original GLB models load after the procedural scene is ready.
-    void loadOriginalGameArt(this.scene, shadows, this.world)
+    void loadOriginalGameArt(this.scene, shadows, this.world, () => !this.disposed)
       .then((count) => { if (!this.disposed) this.artModels = count; })
       .catch((error: unknown) => {
         console.warn("SL Ravan: optional authored game art could not be loaded", error);
