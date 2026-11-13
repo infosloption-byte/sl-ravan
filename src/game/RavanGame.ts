@@ -38,7 +38,7 @@ export class RavanGame {
   private saveTime = 0;
   private disposed = false;
 
-  constructor(private canvas: HTMLCanvasElement, private callbacks: GameCallbacks) {
+  constructor(canvas: HTMLCanvasElement, private callbacks: GameCallbacks) {
     this.engine = new Engine(canvas, true, { stencil: true, preserveDrawingBuffer: false }, true);
     this.engine.setHardwareScalingLevel(Math.min(1.5, Math.max(1, window.devicePixelRatio / 1.5)));
     this.scene = new Scene(this.engine);

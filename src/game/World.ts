@@ -1,6 +1,6 @@
 import {
   Color3, DynamicTexture, GlowLayer, Matrix, Mesh, MeshBuilder, Quaternion,
-  Scene, ShadowGenerator, StandardMaterial, TransformNode, Vector3,
+  Scene, ShadowGenerator, StandardMaterial, Vector3,
   VertexBuffer, VertexData
 } from "@babylonjs/core";
 

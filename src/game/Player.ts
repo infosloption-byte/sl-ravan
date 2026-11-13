@@ -1,6 +1,6 @@
 import {
   Mesh, MeshBuilder, Scene, ShadowGenerator, StandardMaterial,
-  TransformNode, Vector3, Color3
+  TransformNode, Color3
 } from "@babylonjs/core";
 
 export interface PlayerAvatar {
