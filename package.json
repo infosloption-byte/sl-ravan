@@ -25,7 +25,8 @@
     "art:fetch-candidate": "node scripts/fetch-polyhaven-candidate.mjs",
     "test:candidate": "node --test scripts/polyhaven-candidate.test.mjs",
     "art:prepare-candidate": "node scripts/prepare-hero-tree.mjs",
-    "test:prepare": "node --test scripts/prepare-hero-tree.test.mjs"
+    "test:prepare": "node --test scripts/prepare-hero-tree.test.mjs",
+    "art:candidate-size": "node scripts/fetch-polyhaven-candidate.mjs --inspect"
   },
   "dependencies": {
     "@babylonjs/core": "^8.0.0",
