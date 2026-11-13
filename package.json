@@ -16,7 +16,8 @@
     "prebuild": "npm run assets:generate",
     "assets:generate": "node scripts/generate-art.mjs",
     "test:art": "node --test scripts/generate-art.test.mjs",
-    "test:unit": "vitest run src"
+    "test:unit": "vitest run src",
+    "bundle:report": "node scripts/bundle-report.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "^8.0.0",

@@ -100,3 +100,11 @@ For prototype verification, the FPS indicator also shows GLB 0/2 to 2/2. After t
 ## Test runners
 
 The game uses two independent test suites. `npm run test:unit` runs Vitest only against source tests under `src/`, while `npm run test:art` runs the original GLB generator checks with Node's built-in `node:test` runner. Use `npm test` to run both sequentially. The scoped Vitest command prevents the Node-only `scripts/generate-art.test.mjs` file from being incorrectly reported as an empty Vitest suite.
+
+## Milestone 5: Hero animation and bundle inspection
+
+The player now uses an articulated original ancient Lanka fantasy visual proxy with smoother idle, walk, sprint and jump poses. **This is not yet a rigged GLB character.** Motion rules are isolated in `src/game/AvatarMotion.ts` and have five dedicated regression tests. See [character animation notes](docs/CHARACTER_ANIMATION.md).
+
+The seven Babylon-dependent runtime modules now use ES6 deep imports instead of broad barrel imports. To measure the result, run `npm run build` then `npm run bundle:report`. See [bundle guide](docs/BUNDLE_GUIDE.md). Your previous game chunk was approximately 6,038.72 kB minified; the effect of the import change is not yet verified.
+
+The optional GLB loader also checks whether the game has been disposed before attaching models and world blockers.
