@@ -114,3 +114,17 @@ The optional GLB loader also checks whether the game has been disposed before at
 A new blank/startup error appeared immediately after the experimental Babylon ES6 deep-import refactor. The branch has restored the former broad `@babylonjs/core` imports for compatibility with rendering, materials, shaders, mesh creation and glTF loading. This prioritizes working gameplay over bundle-size optimization. Do not reintroduce deep imports without browser smoke tests and required Babylon side-effect registrations.
 
 The launcher now shows the actual caught error message, writes the full exception to the F12 developer console and offers a **Retry Graphics** control. Test the full scene, including GLB 2/2, after pulling and restarting Vite. If the error persists, copy the **first red console error and stack trace** rather than just sending the generic error overlay.
+
+## Forest-village visual slice plan (Milestone 6)
+
+We are shifting from basic procedural low-poly scenery to ONE art-directed, high-fidelity forest village lane. Start from the user's visual reference: detailed tropical foliage, richly textured wooden houses, an irregular winding earth road, a believable traveler, and atmospheric golden sun.
+
+Planning details and quality gates: docs/FOREST_VILLAGE_VISUAL_SLICE.md.
+Structured layout and asset inventory: content/visual-slice/forest-village.json.
+Asset provenance requirements: docs/ASSET_LICENSE_REGISTER.md.
+
+Before touching rendering code, confirm the current draft PR #1 branch starts in the browser without a graphics error. Then source/author and validate one excellent GLB hero tree; build the first polished lane only after that art benchmark is accepted.
+
+Run npm run plan:validate to check scene-manifest consistency, and npm run test:plan to execute four Node-native manifest tests. npm test includes the plan checks alongside existing gameplay and GLB tests.
+
+This commit is a plan and validation scaffold: it does NOT include new high-resolution assets or a realistic scene yet.
