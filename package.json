@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "npm run test:unit && npm run test:art && npm run test:plan && npm run test:asset-quality",
+    "test": "npm run test:unit && npm run test:art && npm run test:plan && npm run test:asset-quality && npm run test:candidate",
     "dev:lan": "vite --host 0.0.0.0",
     "audit": "npm audit",
     "audit:prod": "npm audit --omit=dev",
@@ -21,7 +21,9 @@
     "plan:validate": "node scripts/validate-visual-slice.mjs",
     "test:plan": "node --test scripts/validate-visual-slice.test.mjs",
     "art:install-tree": "node scripts/install-hero-tree.mjs",
-    "test:asset-quality": "node --test scripts/glb-quality.test.mjs"
+    "test:asset-quality": "node --test scripts/glb-quality.test.mjs",
+    "art:fetch-candidate": "node scripts/fetch-polyhaven-candidate.mjs",
+    "test:candidate": "node --test scripts/polyhaven-candidate.test.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "^8.0.0",

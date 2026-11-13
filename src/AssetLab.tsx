@@ -7,9 +7,10 @@ import {
 
 const ASSETS = {
   proxy: import.meta.env.BASE_URL + "assets/generated/heritage-tree.glb",
-  hero: import.meta.env.BASE_URL + "assets/visual-slice/vegetation/hero-tree.glb"
+  hero: import.meta.env.BASE_URL + "assets/visual-slice/vegetation/hero-tree.glb",
+  candidate: import.meta.env.BASE_URL + "assets/visual-slice/candidates/jacaranda/model.gltf"
 };
-type Selection = "proxy" | "hero" | "local";
+type Selection = "proxy" | "hero" | "candidate" | "local";
 interface ViewStats { fps: number; triangles: number; nodes: number; height: number }
 const INITIAL: ViewStats = { fps: 0, triangles: 0, nodes: 0, height: 0 };
 
@@ -78,7 +79,11 @@ export default function AssetLab() {
         await import("@babylonjs/loaders/glTF/2.0");
         if(disposed || !scene)return;
         setStatus("Importing GLB geometry and materials...");
-        const imported = await SceneLoader.ImportMeshAsync(null, "", assetUrl, scene, undefined, ".glb");
+        const lastSlash = assetUrl.lastIndexOf("/");
+        const rootUrl = assetUrl.startsWith("blob:") ? "" : assetUrl.slice(0, lastSlash + 1);
+        const filename = assetUrl.startsWith("blob:") ? assetUrl : assetUrl.slice(lastSlash + 1);
+        const extension = filename.toLowerCase().endsWith(".gltf") ? ".gltf" : ".glb";
+        const imported = await SceneLoader.ImportMeshAsync(null, rootUrl, filename, scene, undefined, extension);
         if(disposed) {
           imported.meshes.forEach(m => m.dispose(false, true));
           return;
@@ -127,7 +132,7 @@ export default function AssetLab() {
     if(blob.current)URL.revokeObjectURL(blob.current);
   }, []);
 
-  function switchSource(next: "proxy" | "hero") {
+  function switchSource(next: "proxy" | "hero" | "candidate") {
     setSource(next);
     setError("");
     setStats(INITIAL);
@@ -166,7 +171,8 @@ export default function AssetLab() {
         <fieldset>
           <legend>Model</legend>
           <label><input type="radio" name="asset" checked={source==="proxy"} onChange={()=>switchSource("proxy")}/> Current procedural tree (comparison)</label>
-          <label><input type="radio" name="asset" checked={source==="hero"} onChange={()=>switchSource("hero")}/> Imported high-detail hero tree</label>
+          <label><input type="radio" name="asset" checked={source==="hero"} onChange={()=>switchSource("hero")}/> Approved local hero GLB</label>
+          <label><input type="radio" name="asset" checked={source==="candidate"} onChange={()=>switchSource("candidate")}/> Poly Haven Jacaranda candidate (after download)</label>
         </fieldset>
         <label className="artlab-file">
           <strong>Preview a local GLB file</strong>

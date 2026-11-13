@@ -14,3 +14,6 @@ public/assets/generated/*.glb
 
 # Locally installed third-party art must be rights-reviewed before source control
 public/assets/visual-slice/vegetation/*.glb
+
+# CC0 asset preview downloads, versioned assets promoted only after review
+public/assets/visual-slice/candidates/
