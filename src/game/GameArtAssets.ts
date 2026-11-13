@@ -1,4 +1,4 @@
-import { Mesh, SceneLoader, type Scene, type ShadowGenerator } from "@babylonjs/core";
+import { Mesh, SceneLoader, type AbstractMesh, type Scene, type ShadowGenerator } from "@babylonjs/core";
 import type { ForestVillage } from "./World";
 import { groundHeight } from "./World";
 
@@ -24,8 +24,8 @@ async function heroFileInstalled(): Promise<boolean> {
 }
 
 function positionHeroTree(
-  meshes: Mesh[],
-  root: Mesh,
+  meshes: AbstractMesh[],
+  root: AbstractMesh,
   x: number,
   z: number,
   desiredHeight: number
