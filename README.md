@@ -108,3 +108,9 @@ The player now uses an articulated original ancient Lanka fantasy visual proxy w
 The seven Babylon-dependent runtime modules now use ES6 deep imports instead of broad barrel imports. To measure the result, run `npm run build` then `npm run bundle:report`. See [bundle guide](docs/BUNDLE_GUIDE.md). Your previous game chunk was approximately 6,038.72 kB minified; the effect of the import change is not yet verified.
 
 The optional GLB loader also checks whether the game has been disposed before attaching models and world blockers.
+
+## Troubleshooting startup (13 November 2026)
+
+A new blank/startup error appeared immediately after the experimental Babylon ES6 deep-import refactor. The branch has restored the former broad `@babylonjs/core` imports for compatibility with rendering, materials, shaders, mesh creation and glTF loading. This prioritizes working gameplay over bundle-size optimization. Do not reintroduce deep imports without browser smoke tests and required Babylon side-effect registrations.
+
+The launcher now shows the actual caught error message, writes the full exception to the F12 developer console and offers a **Retry Graphics** control. Test the full scene, including GLB 2/2, after pulling and restarting Vite. If the error persists, copy the **first red console error and stack trace** rather than just sending the generic error overlay.

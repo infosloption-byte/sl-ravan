@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { RavanGame, GameStats } from "./game/RavanGame";
+import { startupErrorMessage } from "./game/startupError";
 
 const initialStats: GameStats = {
   fps: 0,
@@ -51,11 +52,13 @@ export default function App() {
           });
           game.current = instance;
         } catch (e) {
-          if (!disposed) setError(e instanceof Error ? e.message : "Unable to start the 3D engine.");
+          console.error("[SL Ravan] 3D scene initialization failed", e);
+          if (!disposed) setError(startupErrorMessage(e));
         }
       })
       .catch((e: unknown) => {
-        if (!disposed) setError(e instanceof Error ? e.message : "Unable to load the 3D engine.");
+        console.error("[SL Ravan] 3D module loading failed", e);
+        if (!disposed) setError(startupErrorMessage(e));
       });
 
     return () => {
@@ -144,10 +147,15 @@ export default function App() {
             <div className="divider"><span>◆</span></div>
             <p>Beyond the ancient trees lies a forgotten kingdom. Explore its royal stone gateway, overgrown sanctuaries and tropical forest paths.</p>
             <p className="demo-note">A playable environment test. The Ravana-inspired story comes later.</p>
-            {error && <p className="error" role="alert">{error}</p>}
+            {error && (
+              <p className="error" role="alert">
+                Graphics error: {error}
+                <span className="diagnostics-hint"> Open DevTools (F12) → Console for the detailed error.</span>
+              </p>
+            )}
             {showHelp && <p className="help">Move with WASD or arrows. Hold Shift to sprint. Press Space to jump, E to interact, drag to orbit the camera, and Esc to pause. Progress is saved in this browser.</p>}
-            <button className="primary-button" onClick={paused && started ? resume : start} disabled={!ready || Boolean(error)}>
-              {error ? "GRAPHICS UNAVAILABLE" : !ready ? "PREPARING THE WORLD…" : started ? "CONTINUE JOURNEY" : "ENTER THE WORLD"} <span>↗</span>
+            <button className="primary-button" onClick={error ? () => window.location.reload() : paused && started ? resume : start} disabled={!error && !ready}>
+              {error ? "RETRY GRAPHICS" : !ready ? "PREPARING THE WORLD…" : started ? "CONTINUE JOURNEY" : "ENTER THE WORLD"} <span>↗</span>
             </button>
             <div className="menu-bottom"><span>ANCIENT LANKA · PROTOTYPE</span><span>DESKTOP BROWSER</span></div>
           </section>
