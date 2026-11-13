@@ -38,3 +38,13 @@ Deep imports can affect optional engine extension registration. Verify the follo
 - Console has no missing shader, texture or importer errors
 
 If anything breaks, revert the deep-import commit while preserving the player animation work. Do **not** hide errors by increasing Vite's warning threshold.
+
+## Startup regression and safety rollback — 13 November 2026
+
+The user's screenshot showed **"Unable to start the 3D engine / Graphics unavailable"** after the experimental change to deep Babylon imports. The exact browser stack trace was not available, so missing Babylon side-effect registration is the **leading hypothesis**, not a confirmed root cause.
+
+To restore the last known working renderer configuration, commit `30e54be` reinstates the original broad `@babylonjs/core` imports in seven runtime files, preserving the new articulated player and asynchronous GLB loader. Commit `01a5370` exposes caught startup errors and full console logging. This rollback may return the runtime chunk to roughly the old 6 MB baseline. A larger but working build is preferable to the broken optimized build.
+
+**Do not reintroduce deep imports as one large batch.** First establish a passing browser startup smoke test, then switch one module at a time, explicitly register required engine extensions/shaders and check runtime results. Babylon documentation: https://doc.babylonjs.com/setup/frameworkPackages/npmSupport/ and https://doc.babylonjs.com/setup/frameworkPackages/es6Support/treeShaking/troubleshooting/
+
+**Local validation requirement:** `npm run typecheck`, `npm test`, `npm run build`, then open the scene and confirm trees, ground, GLB load status, interactions, day/night lighting, and console. No automated browser validation of this repair has yet succeeded.
