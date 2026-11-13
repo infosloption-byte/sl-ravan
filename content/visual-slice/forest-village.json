@@ -144,7 +144,7 @@
     "totalArtMiB": 45
   },
   "gates": {
-    "startupVerified": false,
+    "startupVerified": true,
     "artLicensed": false,
     "heroTreeIntegrated": false,
     "cottagesIntegrated": false,
@@ -153,5 +153,17 @@
     "heroRigValidated": false,
     "performanceVerified": false,
     "readyForStory": false
+  },
+  "baseline": {
+    "date": "2026-11-13",
+    "evidence": "User screenshot and local PowerShell output at the visual-slice planning commit",
+    "fpsDisplayed": 56,
+    "modelsLoaded": "GLB 2/2",
+    "vitestPassed": 18,
+    "glbTestsPassed": 2,
+    "planTestsPassed": 4,
+    "typescript": "passed",
+    "viteBuild": "passed",
+    "caveat": "One viewport screenshot; not a 1080p median performance benchmark"
   }
 }

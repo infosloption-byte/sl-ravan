@@ -125,3 +125,7 @@ Planning is on a NEW stacked branch based on draft PR #1. Do not merge to main, 
 ## Art Lab integration checkpoint (implementation started)
 
 The art-preview infrastructure is now present behind `/?artlab`, with a local GLB file picker and a game runtime hook for the optional `hero-tree.glb`. The source asset itself is **still pending**. Gate A cannot be marked complete until a real high-detail tree is acquired/produced, inspected, budgeted, and approved in the actual game. See `docs/HERO_TREE_IMPORT.md`.
+
+## Gate 0 evidence — user verified on 13 Nov 2026
+
+The user confirmed the engine successfully started in Chrome with GLB 2/2 and 56 FPS shown in a single captured viewport. The provided PowerShell output shows 18 Vitest tests, 2 GLB generator tests, 4 manifest tests, successful TypeScript and successful Vite production build. This clears the startup/blockout verification gate, but does **not** establish a stable 1080p median FPS or visual-quality approval. The screenshot still shows obvious low-poly placeholders. The next task is evaluating an external genuinely textured tree candidate, not adding map area.
