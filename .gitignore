@@ -11,3 +11,6 @@ coverage/
 
 # Locally generated original GLB models (automatically rebuilt)
 public/assets/generated/*.glb
+
+# Locally installed third-party art must be rights-reviewed before source control
+public/assets/visual-slice/vegetation/*.glb
