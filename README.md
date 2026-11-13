@@ -70,7 +70,7 @@ The eventual multiplayer implementation will introduce a shared domain simulatio
 - Generated prototype geometry rather than authored, optimized GLB assets.
 - Forest environment is bounded, not infinite world streaming.
 - No account system, backend, combat, quests, or multiplayer yet.
-- No sound files yet; the HUD marks audio as upcoming.
+- No sound files or audio system yet.
 - Save data is only in the current browser and is not synchronized.
 
 See docs/ROADMAP.md for the staged plan and quality acceptance checklist.
