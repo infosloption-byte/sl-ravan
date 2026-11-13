@@ -8,8 +8,7 @@ const initialStats: GameStats = {
   nearby: null,
 };
 
-function Icon({ name }: { name: "sound" | "sun" | "moon" | "map" }) {
-  if (name === "sound") return <span aria-hidden="true">♫</span>;
+function Icon({ name }: { name: "sun" | "moon" | "map" }) {
   if (name === "sun") return <span aria-hidden="true">☼</span>;
   if (name === "moon") return <span aria-hidden="true">☾</span>;
   return <span aria-hidden="true">⌖</span>;
@@ -23,7 +22,6 @@ export default function App() {
   const [started, setStarted] = useState(false);
   const [paused, setPaused] = useState(true);
   const [night, setNight] = useState(false);
-  const [muted, setMuted] = useState(false);
   const [stats, setStats] = useState<GameStats>(initialStats);
   const [notice, setNotice] = useState("Explore the forest village");
   const [showHelp, setShowHelp] = useState(false);
@@ -121,7 +119,6 @@ export default function App() {
             <div className="control-hints"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</span><span><kbd>SHIFT</kbd> Run</span><span><kbd>SPACE</kbd> Jump</span><span><kbd>E</kbd> Interact</span><span>Drag to look</span></div>
             <div className="footer-actions">
               <button onClick={toggleNight} title="Toggle day or night"><Icon name={night ? "moon" : "sun"} /> {night ? "Night" : "Day"}</button>
-              <button onClick={() => setMuted(!muted)} title="Audio is planned for a future phase"><Icon name="sound" /> {muted ? "Muted" : "Audio soon"}</button>
               <button onClick={() => { pause(); setShowHelp(true); }}>? Help</button>
             </div>
           </footer>
