@@ -1,12 +1,7 @@
-import { Color3 } from "@babylonjs/core/Maths/math.color";
-import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
-import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
-import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
-import { PointLight } from "@babylonjs/core/Lights/pointLight";
-import type { Scene } from "@babylonjs/core/scene";
-import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
-import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import {
+  Color3, DynamicTexture, GlowLayer, Matrix, MeshBuilder, PointLight,
+  Quaternion, Scene, ShadowGenerator, StandardMaterial, Vector3
+} from "@babylonjs/core";
 import type { Interaction } from "./World";
 import { packInstanceMatrices } from "./InstanceMatrices";
 

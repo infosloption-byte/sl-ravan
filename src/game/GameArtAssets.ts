@@ -1,7 +1,4 @@
-import { Mesh } from "@babylonjs/core/Meshes/mesh";
-import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
-import type { Scene } from "@babylonjs/core/scene";
-import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
+import { Mesh, SceneLoader, type Scene, type ShadowGenerator } from "@babylonjs/core";
 import type { ForestVillage } from "./World";
 import { groundHeight } from "./World";
 

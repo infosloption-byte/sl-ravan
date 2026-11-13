@@ -1,5 +1,4 @@
-import type { Matrix } from "@babylonjs/core/Maths/math.vector";
-
+import type { Matrix } from "@babylonjs/core";
 /** Babylon thin instances require tightly packed 16-float matrices.
  * Do not use Array.flatMap(matrix => matrix.asArray()): Matrix.asArray()
  * returns a typed array, which flatMap does not flatten.

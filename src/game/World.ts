@@ -1,13 +1,8 @@
-import { Color3 } from "@babylonjs/core/Maths/math.color";
-import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
-import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
-import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
-import type { Scene } from "@babylonjs/core/scene";
-import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
-import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
-import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
-import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
+import {
+  Color3, DynamicTexture, GlowLayer, Matrix, MeshBuilder, Quaternion,
+  Scene, ShadowGenerator, StandardMaterial, Vector3,
+  VertexBuffer, VertexData
+} from "@babylonjs/core";
 import { createLankaTheme } from "./LankaTheme";
 import { packInstanceMatrices } from "./InstanceMatrices";
 import { createForestSurfaceMaterial } from "./ForestSurface";
