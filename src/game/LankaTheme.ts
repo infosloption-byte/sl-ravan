@@ -1,5 +1,5 @@
 import {
-  Color3, DynamicTexture, GlowLayer, Matrix, Mesh, MeshBuilder, PointLight,
+  Color3, DynamicTexture, GlowLayer, Matrix, MeshBuilder, PointLight,
   Quaternion, Scene, ShadowGenerator, StandardMaterial, Vector3
 } from "@babylonjs/core";
 import type { Interaction } from "./World";

@@ -21,6 +21,16 @@ The reference is **inspiration, not a licensed asset**. All shipped models/textu
 - [x] Batch canopy and bushes using thin instancing for lower draw-call overhead
 - [ ] Replace placeholder models with polished assets
 
+## Visual identity
+
+This prototype is inspired by the ancient Lanka/Ravana mythology as a **fantasy setting**, not a historical reconstruction. Design pillars: (1) monumental carved stone with restrained bronze accents, (2) humid tropical greenery and flowing paths, (3) soft golden sunlight and turquoise highlights, (4) recognizable Sri Lankan environmental influences without copying protected game art, (5) scalable, optimized assets.
+
+The new `LankaTheme.ts` is intentionally independent of future story data. Gateway, lotus pools and ruins are scenery and optional interactions only. Environment geometry remains an original stylized blockout. Achieving the user's high-fidelity reference requires Blender-authored GLB modules, high-resolution PBR materials, animation, decals, atmospheric effects and profiling.
+
+## Security note
+
+The Vite dev server now binds only to `127.0.0.1` by default. `npm run dev:lan` explicitly enables LAN exposure and should be used only on a trusted network. Run `npm audit` to identify the precise installed dependency advisories; do not use `npm audit fix --force` without reviewing breaking changes.
+
 ## Milestone B — Visual polish and streaming foundation
 
 1. Build a modular Sri Lankan ancient/fantasy architecture kit in Blender (woodwork, stone, reliefs, banners and roofs).
