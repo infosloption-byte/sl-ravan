@@ -96,3 +96,7 @@ The models are imported asynchronously through @babylonjs/loaders after the proc
 Use npm run assets:generate to regenerate these original models and npm run test:art to validate their glTF headers/accessors. npm test runs existing gameplay tests plus new art tests. These models are higher-detail stylized source assets, not photorealistic AAA art.
 
 For prototype verification, the FPS indicator also shows GLB 0/2 to 2/2. After the scene loads, GLB 2/2 confirms both original models are active; GLB 0/2 or 1/2 indicates missing assets or a loader error. Check the browser console for details. This development indicator is not intended for the final game UI.
+
+## Test runners
+
+The game uses two independent test suites. `npm run test:unit` runs Vitest only against source tests under `src/`, while `npm run test:art` runs the original GLB generator checks with Node's built-in `node:test` runner. Use `npm test` to run both sequentially. The scoped Vitest command prevents the Node-only `scripts/generate-art.test.mjs` file from being incorrectly reported as an empty Vitest suite.
