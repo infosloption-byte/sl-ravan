@@ -36,7 +36,6 @@ export class RavanGame {
   private artModels = 0;
   private jumpVelocity = 0;
   private heightOffset = 0;
-  private animationTime = 0;
   private statsTime = 0;
   private saveTime = 0;
   private disposed = false;
@@ -171,8 +170,10 @@ export class RavanGame {
     this.heightOffset += this.jumpVelocity * dt;
     if (this.heightOffset < 0) { this.heightOffset = 0; this.jumpVelocity = 0; }
     p.y = groundHeight(p.x, p.z) + this.heightOffset;
-    this.animationTime += dt;
-    this.player.updateAnimation(this.animationTime, moving, sprinting);
+    // Visual motion blends locally; gameplay position and jumping remain
+    // controlled by the existing game simulation.
+    const nowGrounded = this.heightOffset <= .01 && this.jumpVelocity <= 0;
+    this.player.updateAnimation(dt, moving, sprinting, nowGrounded);
     this.camera.target = Vector3.Lerp(this.camera.target, p.add(new Vector3(0, 1.55, 0)), Math.min(1, dt * 6));
     this.saveTime += dt;
     if (this.saveTime > 12) { this.saveTime = 0; this.save(); }
