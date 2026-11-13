@@ -1,7 +1,11 @@
-import {
-  ArcRotateCamera, Color3, Color4, DirectionalLight, Engine,
-  HemisphericLight, Scene, ShadowGenerator, Vector3
-} from "@babylonjs/core";
+import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
+import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
+import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
+import { Engine } from "@babylonjs/core/Engines/engine";
+import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
+import { Scene } from "@babylonjs/core/scene";
+import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { LocalSession } from "./LocalSession";
 import { createPlayer, type PlayerAvatar } from "./Player";
 import { createForestVillage, type ForestVillage, groundHeight } from "./World";

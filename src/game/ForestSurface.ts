@@ -1,4 +1,8 @@
-import { Color3, DynamicTexture, Scene, StandardMaterial, Texture } from "@babylonjs/core";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
+import type { Scene } from "@babylonjs/core/scene";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 
 /**
  * Subtle tileable color-grain for the original blockout terrain.

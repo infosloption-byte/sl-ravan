@@ -1,7 +1,10 @@
-import {
-  Mesh, MeshBuilder, Scene, ShadowGenerator, StandardMaterial,
-  TransformNode, Color3
-} from "@babylonjs/core";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import type { Scene } from "@babylonjs/core/scene";
+import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { createMotionState, stepAvatarMotion } from "./AvatarMotion";
 
 export interface PlayerAvatar {
