@@ -2,77 +2,128 @@ import {
   Mesh, MeshBuilder, Scene, ShadowGenerator, StandardMaterial,
   TransformNode, Color3
 } from "@babylonjs/core";
+import { createMotionState, stepAvatarMotion } from "./AvatarMotion";
 
 export interface PlayerAvatar {
   root: TransformNode;
-  updateAnimation: (elapsed: number, moving: boolean, sprinting: boolean) => void;
+  updateAnimation: (dt: number, moving: boolean, sprinting: boolean, grounded: boolean) => void;
 }
 
-/** Self-contained stylized test character; can later be swapped for an animated GLB. */
+/**
+ * A more expressive, original ancient-Lanka-fantasy explorer.
+ *
+ * This is an articulated, engine-side proxy rig — NOT a final skeletal GLB.
+ * Movement and animation states are independent of Babylon, so a rigged
+ * character GLB can later replace the geometry without changing game rules.
+ */
 export function createPlayer(scene: Scene, shadows: ShadowGenerator): PlayerAvatar {
   const root = new TransformNode("player-root", scene);
-  const skin = material("player-skin", "#e2a97e");
-  const tunic = material("player-tunic", "#e8dcc1");
-  const blue = material("player-shoulder-wrap", "#4f8aa0");
-  const dark = material("player-boots", "#25333c");
-  const hair = material("player-hair", "#24212a");
-  const leather = material("player-leather", "#936342");
-  const gold = material("player-gold", "#d7b56c");
+  const body = new TransformNode("hero-visual-rig", scene);
+  body.parent = root;
+  const motion = createMotionState();
 
-  function material(name: string, hex: string) {
+  function surface(name: string, hex: string, metal = false) {
     const m = new StandardMaterial(name, scene);
     m.diffuseColor = Color3.FromHexString(hex);
-    m.specularColor = new Color3(.09, .09, .09);
+    m.specularColor = metal ? new Color3(.32, .28, .19) : new Color3(.06, .06, .06);
     return m;
   }
+  const skin = surface("hero-skin", "#b87e53");
+  const ivory = surface("hero-sand-linen", "#e5d6ac");
+  const indigo = surface("hero-indigo-wrap", "#315d67");
+  const dusk = surface("hero-deep-indigo", "#284451");
+  const burgundy = surface("hero-royal-trim", "#88443b");
+  const leather = surface("hero-aged-leather", "#76503a");
+  const dark = surface("hero-hair-and-boots", "#2c2a29");
+  const copper = surface("hero-antique-gold", "#c6a268", true);
 
-  function part(name: string, mesh: Mesh, mat: StandardMaterial, parent: TransformNode, pos: [number, number, number], scale?: [number, number, number]) {
-    mesh.name = name;
-    mesh.material = mat;
-    mesh.parent = parent;
-    mesh.position.set(...pos);
-    if (scale) mesh.scaling.set(...scale);
-    shadows.addShadowCaster(mesh);
+  function part(name: string, mesh: Mesh, material: StandardMaterial, parent: TransformNode,
+    xyz: [number,number,number], castShadow=false) {
+    mesh.name=name;
+    mesh.material=material;
+    mesh.parent=parent;
+    mesh.position.set(...xyz);
+    if(castShadow) shadows.addShadowCaster(mesh);
     return mesh;
   }
+  const cylinder=(name:string,height:number,diameter:number,parent:TransformNode,
+    xyz:[number,number,number],material:StandardMaterial,cast=false)=>
+      part(name,MeshBuilder.CreateCylinder(name,{height,diameter,tessellation:12},scene),material,parent,xyz,cast);
+  const block=(name:string,w:number,h:number,d:number,parent:TransformNode,
+    xyz:[number,number,number],material:StandardMaterial,cast=false)=>
+      part(name,MeshBuilder.CreateBox(name,{width:w,height:h,depth:d},scene),material,parent,xyz,cast);
+  const sphere=(name:string,r:number,parent:TransformNode,xyz:[number,number,number],
+    material:StandardMaterial,cast=false)=>
+      part(name,MeshBuilder.CreateSphere(name,{diameter:r*2,segments:12},scene),material,parent,xyz,cast);
 
-  part("torso", MeshBuilder.CreateCylinder("torso", { height: .92, diameterTop: .64, diameterBottom: .75, tessellation: 10 }, scene), tunic, root, [0, 1.24, 0]);
-  part("cape", MeshBuilder.CreateBox("cape", { width: .76, height: .78, depth: .12 }, scene), blue, root, [0, 1.25, -.32]);
-  part("belt", MeshBuilder.CreateCylinder("belt", { height: .14, diameter: .75, tessellation: 12 }, scene), leather, root, [0, .89, 0]);
-  part("head", MeshBuilder.CreateSphere("head", { diameter: .54, segments: 14 }, scene), skin, root, [0, 2.02, .05]);
-  part("hair cap", MeshBuilder.CreateSphere("hair", { diameter: .56, segments: 12 }, scene), hair, root, [0, 2.20, -.05], [1, .64, 1]);
-  part("hair knot", MeshBuilder.CreateSphere("hair-knot", { diameter: .28, segments: 10 }, scene), hair, root, [0, 2.37, -.23]);
-  part("satchel", MeshBuilder.CreateBox("satchel", { width: .39, height: .4, depth: .2 }, scene), leather, root, [.42, 1.05, -.21]);
-  const strap = part("satchel strap", MeshBuilder.CreateBox("strap", { width: .08, height: .95, depth: .09 }, scene), gold, root, [.12, 1.41, -.35]);
-  strap.rotation.z = -.44;
+  cylinder("embroidered-tunic",.88,.66,body,[0,1.28,0],ivory,true);
+  cylinder("waist-wrap",.22,.71,body,[0,.89,0],indigo);
+  cylinder("copper-belt",.10,.77,body,[0,.96,0],copper);
+  block("front-robe-fold",.32,.45,.08,body,[.10,.69,.29],ivory);
+  block("royal-robe-ribbon",.11,.55,.085,body,[-.19,.71,.295],burgundy);
+  block("back-mantle",.76,.87,.10,body,[0,1.20,-.35],dusk,true);
+  block("mantle-trim",.76,.08,.12,body,[0,.78,-.36],copper);
 
-  const leftLeg = new TransformNode("left-leg-pivot", scene);
-  const rightLeg = new TransformNode("right-leg-pivot", scene);
-  leftLeg.parent = root; rightLeg.parent = root;
-  leftLeg.position.set(-.20, .83, 0); rightLeg.position.set(.20, .83, 0);
-  for (const [name, parent] of [["left", leftLeg], ["right", rightLeg]] as const) {
-    part(name + "-leg", MeshBuilder.CreateCylinder(name + "-leg", { height: .72, diameter: .25, tessellation: 9 }, scene), dark, parent, [0, -.35, 0]);
-    part(name + "-boot", MeshBuilder.CreateBox(name + "-boot", { width: .3, height: .21, depth: .45 }, scene), leather, parent, [0, -.70, .08]);
+  const shawl = block("shoulder-wrap",.83,.29,.73,body,[0,1.57,-.12],indigo,true);
+  shawl.rotation.z=.04;
+  block("shoulder-embroidered-trim",.82,.075,.14,body,[0,1.57,.245],copper);
+  const strap = block("travel-strap",.085,.9,.095,body,[.14,1.31,-.33],leather);
+  strap.rotation.z=-.42;
+  block("leather-travel-bag",.36,.39,.22,body,[.39,1.03,-.3],leather);
+  block("travel-bag-clasp",.18,.08,.06,body,[.39,1.08,-.43],copper);
+
+  const head = new TransformNode("hero-head-joint",scene);
+  head.parent=body;
+  head.position.set(0,1.86,.04);
+  sphere("hero-face",.28,head,[0,.12,.05],skin,true);
+  const hairCap=sphere("long-black-hair",.29,head,[0,.32,-.03],dark);
+  hairCap.scaling.y=.67;
+  sphere("hair-topknot",.18,head,[0,.52,-.14],dark);
+  cylinder("hair-ring",.06,.20,head,[0,.42,-.14],copper);
+  block("forehead-band",.52,.08,.09,head,[0,.29,.235],burgundy);
+  sphere("left-eye",.038,head,[-.105,.135,.305],dark);
+  sphere("right-eye",.038,head,[.105,.135,.305],dark);
+  for(const x of [-.27,.27]) {
+    const earring=sphere("copper-earring",.062,head,[x,.055,.04],copper);
+    earring.scaling.y=1.35;
   }
 
-  const leftArm = new TransformNode("left-arm-pivot", scene);
-  const rightArm = new TransformNode("right-arm-pivot", scene);
-  leftArm.parent = root; rightArm.parent = root;
-  leftArm.position.set(-.44, 1.63, 0); rightArm.position.set(.44, 1.63, 0);
-  part("left-sleeve", MeshBuilder.CreateCylinder("left-sleeve", { height: .65, diameter: .25, tessellation: 10 }, scene), blue, leftArm, [0, -.29, 0]);
-  part("right-sleeve", MeshBuilder.CreateCylinder("right-sleeve", { height: .65, diameter: .25, tessellation: 10 }, scene), tunic, rightArm, [0, -.29, 0]);
-  part("left-hand", MeshBuilder.CreateSphere("left-hand", { diameter: .19, segments: 9 }, scene), skin, leftArm, [0, -.64, 0]);
-  part("right-hand", MeshBuilder.CreateSphere("right-hand", { diameter: .19, segments: 9 }, scene), skin, rightArm, [0, -.64, 0]);
+  function limbPivot(name:string,position:[number,number,number]) {
+    const joint=new TransformNode(name,scene);
+    joint.parent=body; joint.position.set(...position);
+    return joint;
+  }
+  const leftLeg=limbPivot("left-leg",[-.205,.83,0]);
+  const rightLeg=limbPivot("right-leg",[.205,.83,0]);
+  for(const [side,joint] of [["left",leftLeg],["right",rightLeg]] as const) {
+    cylinder(side+"-trouser",.72,.24,joint,[0,-.37,0],dusk);
+    cylinder(side+"-shin-guard",.27,.27,joint,[0,-.53,.02],leather);
+    block(side+"-leather-sandal",.32,.18,.46,joint,[0,-.75,.09],dark);
+    block(side+"-ankle-metal",.29,.055,.34,joint,[0,-.61,.05],copper);
+  }
+  const leftArm=limbPivot("left-arm",[-.47,1.6,0]);
+  const rightArm=limbPivot("right-arm",[.47,1.6,0]);
+  for(const [side,joint] of [["left",leftArm],["right",rightArm]] as const) {
+    cylinder(side+"-sleeve",.33,.26,joint,[0,-.13,0],side==="left"?indigo:ivory);
+    cylinder(side+"-forearm",.36,.20,joint,[0,-.41,0],skin);
+    cylinder(side+"-bronze-cuff",.13,.24,joint,[0,-.52,0],copper);
+    sphere(side+"-hand",.12,joint,[0,-.70,0],skin);
+  }
+  const cape = block("loose-cloak-tail",.65,.53,.07,body,[0,.63,-.37],burgundy);
+  cape.rotation.x=.08;
 
   return {
     root,
-    updateAnimation: (elapsed, moving, sprinting) => {
-      const swing = moving ? Math.sin(elapsed * (sprinting ? 12 : 8)) * (sprinting ? .65 : .4) : 0;
-      leftLeg.rotation.x = swing;
-      rightLeg.rotation.x = -swing;
-      leftArm.rotation.x = -swing * .7;
-      rightArm.rotation.x = swing * .7;
-      root.scaling.y = moving ? 1 + Math.abs(Math.sin(elapsed * (sprinting ? 12 : 8))) * .014 : 1;
+    updateAnimation(dt,moving,sprinting,grounded) {
+      const pose=stepAvatarMotion(motion,{moving,sprinting,grounded},dt);
+      leftLeg.rotation.x=pose.leftLeg;
+      rightLeg.rotation.x=pose.rightLeg;
+      leftArm.rotation.x=pose.leftArm;
+      rightArm.rotation.x=pose.rightArm;
+      body.position.y=pose.bodyBob;
+      body.rotation.x=pose.forwardLean;
+      head.rotation.y=pose.headTurn;
+      cape.rotation.x=pose.capeSwing + .08;
     }
   };
 }
