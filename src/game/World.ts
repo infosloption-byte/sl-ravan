@@ -1,16 +1,24 @@
 import {
-  Color3, DynamicTexture, GlowLayer, Matrix, MeshBuilder, Quaternion,
-  Scene, ShadowGenerator, StandardMaterial, Vector3,
-  VertexBuffer, VertexData
+  Color3, GlowLayer, Matrix, Mesh, MeshBuilder, Quaternion, Scene, ShadowGenerator,
+  StandardMaterial, TransformNode, Vector3, VertexBuffer, VertexData
 } from "@babylonjs/core";
 import { createLankaTheme } from "./LankaTheme";
 import { packInstanceMatrices } from "./InstanceMatrices";
-import { createForestSurfaceMaterial } from "./ForestSurface";
+import { fbm, mulberry32, smoothstep } from "./Noise";
+import type { TerrainBounds } from "./TerrainPaint";
+import {
+  createBarkTexture, createClothTexture, createFlowerTexture, createFrondTexture, createGrassTexture,
+  createGroundAlbedo, createGroundNormalMap, createLeafTexture, createPlankTexture, createRockTexture,
+  createThatchTexture
+} from "./ProceduralTextures";
+import {
+  createFernClumpMesh, createFlowerPatchMesh, createFoliageMaterial, createGrassTuftMesh, createLeafClusterMesh
+} from "./Foliage";
 
 /**
- * First environment concept: a dense, sunlit forest village.
- * All geometry and textures are locally generated so the sample has no
- * external art dependencies. Replacements can use glTF/GLB assets later.
+ * Forest village world. Terrain paint, foliage cards, timber houses and the
+ * outer horizon are all generated locally, so the game has no external art
+ * dependencies. Authored GLB modules can replace pieces later.
  */
 
 export interface Interaction {
@@ -26,109 +34,216 @@ export interface ForestVillage {
   addBlocker: (x: number, z: number, rx: number, rz: number) => void;
 }
 
-type RGB = [number, number, number];
 interface Blocker { x: number; z: number; rx: number; rz: number }
 
-function rng(seed: number) {
-  let state = seed >>> 0;
-  return () => {
-    state += 0x6d2b79f5;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-const random = rng(20261113);
-function randomBetween(min: number, max: number) { return min + random() * (max - min); }
-function pathCenter(z: number) { return Math.sin(z * .033) * 2.4 + Math.sin(z * .083) * .65; }
+/** World-space extent of the detailed, playable terrain mesh. */
+export const TERRAIN: TerrainBounds = { minX: -100, maxX: 100, minZ: -120, maxZ: 120 };
+
+export function pathCenter(z: number) { return Math.sin(z * .033) * 2.4 + Math.sin(z * .083) * .65; }
 export function groundHeight(x: number, z: number) {
   const hills = .30 * Math.sin(x * .035 + z * .021)
     + .20 * Math.cos(z * .045 - x * .02)
     + .12 * Math.sin(x * .073) * Math.cos(z * .06);
   const distance = Math.abs(x - pathCenter(z));
   const slope = Math.min(1, Math.max(0, (distance - 3.5) / 13));
-  return hills * (.26 + slope * .74) + Math.min(5, Math.max(0, (Math.abs(x) - 35) * .075));
+  // The trail is slightly sunken, with softly raised banks either side.
+  const groove = 1 - smoothstep(1.2, 5.4, distance);
+  return hills * (.26 + slope * .74) + Math.min(5, Math.max(0, (Math.abs(x) - 35) * .075)) - groove * .3;
 }
 
+const HOUSES: Array<[number, number, number, boolean]> = [
+  [-13.5, 12, 1.08, false], [13.2, 21, .98, true], [-14.5, 40, 1.15, true],
+  [14.7, 55, 1.05, true], [-13.3, 74, .92, false], [14.2, 87, 1.09, false],
+];
+
 function color(hex: string) { return Color3.FromHexString(hex); }
-function material(scene: Scene, name: string, hex: string, options: { emissive?: string; alpha?: number; rough?: boolean } = {}) {
+function material(scene: Scene, name: string, hex: string, options: { emissive?: Color3; alpha?: number } = {}) {
   const m = new StandardMaterial(name, scene);
   m.diffuseColor = color(hex);
-  m.specularColor = options.rough === false ? new Color3(.18, .17, .15) : Color3.Black();
-  if (options.emissive) m.emissiveColor = color(options.emissive);
+  m.specularColor = Color3.Black();
+  if (options.emissive) m.emissiveColor = options.emissive;
   if (options.alpha !== undefined) m.alpha = options.alpha;
   return m;
 }
-function box(scene: Scene, name: string, w: number, h: number, d: number, x: number, y: number, z: number, mat: StandardMaterial, shadows?: ShadowGenerator) {
+
+interface BoxOptions { shadows?: ShadowGenerator; parts?: Mesh[]; parent?: TransformNode }
+function box(
+  scene: Scene, name: string, w: number, h: number, d: number, x: number, y: number, z: number,
+  mat: StandardMaterial, options: BoxOptions = {}
+) {
   const mesh = MeshBuilder.CreateBox(name, { width: w, height: h, depth: d }, scene);
   mesh.position.set(x, y, z);
   mesh.material = mat;
-  if (shadows) shadows.addShadowCaster(mesh);
   mesh.receiveShadows = true;
+  if (options.parent) mesh.parent = options.parent;
+  if (options.shadows) options.shadows.addShadowCaster(mesh);
+  options.parts?.push(mesh);
+  return mesh;
+}
+
+/**
+ * Triangular gable end: prism with its apex at +Y. Every face is wound so the
+ * triangle's right-handed cross product matches the declared outward normal
+ * (Babylon's front-face convention), so nothing is culled from outside.
+ */
+function gablePrism(scene: Scene, name: string, halfWidth: number, height: number, depth: number) {
+  const hz = depth / 2;
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  const face = (verts: number[][], n: number[], faceUvs: number[][]) => {
+    const base = positions.length / 3;
+    verts.forEach((v, i) => { positions.push(...v); normals.push(...n); uvs.push(...faceUvs[i]); });
+    const [p0, p1, p2] = verts;
+    const ux = p1[0] - p0[0], uy = p1[1] - p0[1], uz = p1[2] - p0[2];
+    const vx = p2[0] - p0[0], vy = p2[1] - p0[1], vz = p2[2] - p0[2];
+    const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+    const outward = cx * n[0] + cy * n[1] + cz * n[2] > 0;
+    const order = verts.length === 3 ? [0, 1, 2] : [0, 1, 2, 0, 2, 3];
+    (outward ? order : order.slice().reverse()).forEach((i) => indices.push(base + i));
+  };
+  const A = [-halfWidth, 0], B = [halfWidth, 0], C = [0, height];
+  face([[A[0], A[1], hz], [B[0], B[1], hz], [C[0], C[1], hz]], [0, 0, 1], [[0, 0], [1, 0], [.5, 1]]);
+  face([[B[0], B[1], -hz], [A[0], A[1], -hz], [C[0], C[1], -hz]], [0, 0, -1], [[0, 0], [1, 0], [.5, 1]]);
+  const len = Math.hypot(height, halfWidth);
+  face([[A[0], A[1], -hz], [A[0], A[1], hz], [C[0], C[1], hz], [C[0], C[1], -hz]], [-height / len, halfWidth / len, 0],
+    [[0, 0], [1, 0], [1, 1], [0, 1]]);
+  face([[B[0], B[1], hz], [B[0], B[1], -hz], [C[0], C[1], -hz], [C[0], C[1], hz]], [height / len, halfWidth / len, 0],
+    [[0, 0], [1, 0], [1, 1], [0, 1]]);
+  const mesh = new Mesh(name, scene);
+  const data = new VertexData();
+  data.positions = positions; data.normals = normals; data.uvs = uvs; data.indices = indices;
+  data.applyToMesh(mesh);
+  return mesh;
+}
+
+function instanceBatch(mesh: Mesh, matrices: Matrix[], colors?: number[]) {
+  if (!matrices.length) { mesh.dispose(); return; }
+  mesh.thinInstanceSetBuffer("matrix", packInstanceMatrices(matrices), 16, true);
+  if (colors && colors.length === matrices.length * 4) {
+    mesh.thinInstanceSetBuffer("color", new Float32Array(colors), 4, true);
+  }
+  mesh.thinInstanceRefreshBoundingInfo();
+}
+
+/**
+ * Coarse low-poly ground that extends the world to the horizon. It sits on
+ * the same height field and hides underneath the detailed terrain, so the
+ * playable area never ends in a visible edge.
+ */
+function createOuterGround(scene: Scene) {
+  const size = 1200;
+  const subdivisions = 60; // 20 m cells: the detailed terrain edge falls on grid lines.
+  const mesh = MeshBuilder.CreateGround("outer-forest-ground", {
+    width: size, height: size, subdivisions, updatable: true
+  }, scene);
+  const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+  const indices = mesh.getIndices();
+  if (!positions || !indices) return mesh;
+  const colors: number[] = [];
+  const eps = .001;
+  for (let i = 0; i < positions.length; i += 3) {
+    const x = positions[i];
+    const z = positions[i + 2];
+    const inside = x > TERRAIN.minX - eps && x < TERRAIN.maxX + eps && z > TERRAIN.minZ - eps && z < TERRAIN.maxZ + eps;
+    const onEdge = inside && (Math.abs(Math.abs(x) - TERRAIN.maxX) < eps || Math.abs(Math.abs(z) - TERRAIN.maxZ) < eps);
+    const height = groundHeight(x, z);
+    positions[i + 1] = inside && !onEdge ? height - 5 : height - .04;
+    const t = fbm(x * .006, z * .006, 3, 21);
+    colors.push(.12 + t * .1, .27 + t * .16, .15 + t * .08, 1);
+  }
+  mesh.updateVerticesData(VertexBuffer.PositionKind, positions);
+  const normals = new Float32Array(positions.length);
+  VertexData.ComputeNormals(positions, indices, normals);
+  mesh.updateVerticesData(VertexBuffer.NormalKind, normals);
+  mesh.setVerticesData(VertexBuffer.ColorKind, colors);
+  const outer = material(scene, "outer-forest", "#ffffff");
+  mesh.material = outer;
+  mesh.receiveShadows = false;
+  mesh.isPickable = false;
   return mesh;
 }
 
 export function createForestVillage(scene: Scene, shadows: ShadowGenerator): ForestVillage {
+  // Per-world RNG: the layout is identical on every launch and React remount.
+  const random = mulberry32(20261113);
+  const randomBetween = (min: number, max: number) => min + random() * (max - min);
+
   const blockers: Blocker[] = [];
   const interactions: Interaction[] = [];
   const glow = new GlowLayer("lantern-and-shrine-glow", scene);
-  glow.intensity = .58;
+  glow.intensity = .5;
 
-  const earth = material(scene, "earth", "#a8a774");
-  const trunk = material(scene, "ancient-bark", "#614b35");
-  const barkDark = material(scene, "dark-bark", "#453e30");
-  const wood = material(scene, "wood", "#85664a");
-  const beams = material(scene, "timber-beams", "#4a372b");
-  const roof = material(scene, "mossy-thatch", "#6c7250");
-  const roofLight = material(scene, "roof-thatch-highlights", "#a18a5c");
-  const stone = material(scene, "stone", "#777d75");
-  const stoneDark = material(scene, "mossy-stone", "#54645b");
-  const flag = material(scene, "blue-market-cloth", "#4b768d");
+  // ---- Textures and materials ------------------------------------------
+  const barkTexture = createBarkTexture(scene);
+  barkTexture.uScale = 2; barkTexture.vScale = 3;
+  const thatchTexture = createThatchTexture(scene);
+  thatchTexture.uScale = 3; thatchTexture.vScale = 2;
+  const plankTexture = createPlankTexture(scene);
+  plankTexture.uScale = 1.6; plankTexture.vScale = 1.2;
+  const rockTexture = createRockTexture(scene);
+
+  const textured = (name: string, texture: Parameters<typeof createFoliageMaterial>[2], tint: string) => {
+    const m = material(scene, name, tint);
+    m.diffuseTexture = texture;
+    return m;
+  };
+  const trunk = textured("ancient-bark", barkTexture, "#e2d2bd");
+  const barkDark = textured("dark-bark", barkTexture, "#a8957f");
+  const wood = textured("wood-planks", plankTexture, "#ffffff");
+  const woodUpper = textured("wood-planks-upper", plankTexture, "#d7c3a6");
+  const beams = material(scene, "timber-beams", "#40301f");
+  const roof = textured("thatch-roof", thatchTexture, "#ffffff");
+  const stone = textured("mossy-rock-light", rockTexture, "#ffffff");
+  const stoneDark = textured("mossy-rock-dark", rockTexture, "#8aa090");
+  const clothBlue = textured("blue-market-cloth", createClothTexture(scene, "cloth-blue", "#3f6f8c", "#e8e2cf"), "#ffffff");
+  const clothCream = textured("cream-market-cloth", createClothTexture(scene, "cloth-cream", "#ddd2b4", "#8a4a38"), "#ffffff");
+  clothBlue.backFaceCulling = false;
+  clothCream.backFaceCulling = false;
   const gold = material(scene, "old-gold", "#ceb87e");
-  const leafMaterials = ["#4c7c43", "#65954d", "#2b653f", "#81a556", "#437b58", "#9cb76f"]
-    .map((hex, i) => material(scene, "leaf-" + i, hex));
-  const bushMats = ["#306c44", "#43854a", "#608b43", "#759b53"]
-    .map((hex, i) => material(scene, "understory-" + i, hex));
-  const canopyTransforms: Matrix[][] = leafMaterials.map(() => []);
-  const trunkTransforms: Matrix[][] = [[], []];
-  const rockTransforms: Matrix[][] = [[], []];
-  const lantern = material(scene, "warm-lantern", "#fff2b6", { emissive: "#eebc69" });
-  const shrineLight = material(scene, "ancient-arcane", "#72d6d3", { emissive: "#2fb6ae" });
-  const cloth = material(scene, "ribbon-fabric", "#a6c7b2", { alpha: .9 });
+  const coreMaterial = material(scene, "canopy-core", "#2c5a33");
+  const lantern = material(scene, "warm-lantern", "#fff2b6", { emissive: new Color3(1.5, 1.05, .5) });
+  const shrineLight = material(scene, "ancient-arcane", "#72d6d3", { emissive: new Color3(.2, .7, .66) });
+  const frondMaterial = createFoliageMaterial(scene, "fern-frond-mat", createFrondTexture(scene), "#ffffff", .38);
+  const leafMaterial = createFoliageMaterial(scene, "leaf-cluster-mat", createLeafTexture(scene), "#ffffff", .4);
+  const grassMaterial = createFoliageMaterial(scene, "grass-tuft-mat", createGrassTexture(scene), "#ffffff", .35);
+  const flowerMaterial = createFoliageMaterial(scene, "flower-mat", createFlowerTexture(scene), "#ffffff", .4);
 
-  // Terrain with a naturally winding earthen path painted directly in the mesh.
-  const land = MeshBuilder.CreateGround("forest-terrain", {
-    width: 200, height: 230, subdivisions: 136, updatable: true
-  }, scene);
+  // ---- Terrain ----------------------------------------------------------
+  const width = TERRAIN.maxX - TERRAIN.minX;
+  const depth = TERRAIN.maxZ - TERRAIN.minZ;
+  const land = MeshBuilder.CreateGround("forest-terrain", { width, height: depth, subdivisions: 160, updatable: true }, scene);
   const positions = land.getVerticesData(VertexBuffer.PositionKind);
   const indices = land.getIndices();
   if (positions && indices) {
-    const colors: number[] = [];
+    const uvs: number[] = [];
     for (let index = 0; index < positions.length; index += 3) {
       const x = positions[index];
       const z = positions[index + 2];
       positions[index + 1] = groundHeight(x, z);
-      const d = Math.abs(x - pathCenter(z) + Math.sin(z * .51) * .38);
-      const jagged = Math.sin(x * 1.8 + z * .4) * .27 + Math.sin(z * 2.3) * .16;
-      let rgb: RGB;
-      const variation = Math.sin(x * .33 + z * .26) * .055 + Math.cos(x * .71 - z * .28) * .035;
-      if (d < 2.8 + jagged) rgb = [.45, .34, .24];
-      else if (d < 4.7 + jagged) rgb = [.37, .44, .26];
-      else if (Math.abs(x) > 50) rgb = [.26, .38, .27];
-      else rgb = [.31, .49, .29];
-      colors.push(Math.max(.06, rgb[0] + variation), Math.max(.06, rgb[1] + variation), Math.max(.06, rgb[2] + variation), 1);
+      uvs.push((x - TERRAIN.minX) / width, (z - TERRAIN.minZ) / depth);
     }
     land.updateVerticesData(VertexBuffer.PositionKind, positions);
     const normals = new Float32Array(positions.length);
     VertexData.ComputeNormals(positions, indices, normals);
     land.updateVerticesData(VertexBuffer.NormalKind, normals);
-    land.setVerticesData(VertexBuffer.ColorKind, colors);
+    land.setVerticesData(VertexBuffer.UVKind, uvs);
   }
-  const groundMat = createForestSurfaceMaterial(scene);
-  land.material = groundMat;
+  const groundMaterial = new StandardMaterial("forest-ground", scene);
+  groundMaterial.diffuseTexture = createGroundAlbedo(scene, TERRAIN, pathCenter);
+  const groundNormal = createGroundNormalMap(scene);
+  groundNormal.uScale = 70; groundNormal.vScale = 84;
+  groundNormal.level = .6;
+  groundMaterial.bumpTexture = groundNormal;
+  groundMaterial.specularColor = Color3.Black();
+  land.material = groundMaterial;
   land.receiveShadows = true;
+  land.isPickable = false;
+  createOuterGround(scene);
 
+  // ---- Rocks ------------------------------------------------------------
+  const rockTransforms: Matrix[][] = [[], []];
   function stoneAt(x: number, z: number, size: number) {
     const y = groundHeight(x, z);
     const kind = random() > .45 ? 0 : 1;
@@ -139,44 +254,63 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
     ));
   }
 
-  // The large tree silhouettes are deliberate: the reference is all about
-  // canopy depth, foliage silhouettes and diffuse sunlit green layers.
-  function treeAt(x: number, z: number, scale = 1, ancient = false) {
+  // ---- Trees: instanced trunks + shadow-casting cores + leaf-card crowns --
+  const trunkTransforms: Matrix[][] = [[], []];
+  const coreTransforms: Matrix[] = [];
+  const clusterTransforms: Matrix[] = [];
+  const clusterColors: number[] = [];
+  const pushCluster = (scale: Vector3, position: Vector3, shade = 1) => {
+    clusterTransforms.push(Matrix.Compose(scale, Quaternion.FromEulerAngles(random() * .5, random() * Math.PI * 2, random() * .5), position));
+    clusterColors.push(
+      (.82 + random() * .3) * shade, (.88 + random() * .2) * shade, (.74 + random() * .24) * shade, 1
+    );
+  };
+
+  function treeAt(x: number, z: number, scaleFactor = 1, ancient = false, detail = 1) {
     const y = groundHeight(x, z);
-    const height = (ancient ? randomBetween(11, 16) : randomBetween(6.5, 10.5)) * scale;
-    const width = (ancient ? 1.9 : .9) * scale;
+    const height = (ancient ? randomBetween(11, 16) : randomBetween(6.5, 10.5)) * scaleFactor;
+    const trunkWidth = (ancient ? 1.9 : .9) * scaleFactor;
     trunkTransforms[ancient ? 1 : 0].push(Matrix.Compose(
-      new Vector3(width, height, width),
+      new Vector3(trunkWidth, height, trunkWidth),
       Quaternion.FromEulerAngles(0, 0, randomBetween(-.09, .09)),
       new Vector3(x, y + height * .46, z)
     ));
-
     const crowns = ancient ? 7 : 4;
     for (let i = 0; i < crowns; i++) {
-      const offsetX = randomBetween(-2.2, 2.2) * scale;
-      const offsetZ = randomBetween(-1.9, 1.9) * scale;
-      const radius = randomBetween(2.2, 3.45) * scale * (ancient ? 1.22 : 1);
-      const leafType = Math.floor(random() * leafMaterials.length);
-      canopyTransforms[leafType].push(Matrix.Compose(
-        new Vector3(radius, radius * randomBetween(.62, .92), radius * randomBetween(.80, 1.15)),
+      const offsetX = randomBetween(-2.2, 2.2) * scaleFactor;
+      const offsetZ = randomBetween(-1.9, 1.9) * scaleFactor;
+      const radius = randomBetween(2.2, 3.45) * scaleFactor * (ancient ? 1.22 : 1);
+      const cx = x + offsetX;
+      const cy = y + height * randomBetween(.70, 1.00);
+      const cz = z + offsetZ;
+      coreTransforms.push(Matrix.Compose(
+        new Vector3(radius * .7, radius * .55, radius * .7),
         Quaternion.FromEulerAngles(0, random() * Math.PI * 2, 0),
-        new Vector3(x + offsetX, y + height * randomBetween(.70, 1.00), z + offsetZ)
+        new Vector3(cx, cy, cz)
       ));
+      const clusters = detail > 0 ? 3 : 1;
+      for (let k = 0; k < clusters; k++) {
+        const spread = radius * .5;
+        pushCluster(
+          new Vector3(radius * randomBetween(1.5, 2.1), radius * randomBetween(1.25, 1.7), radius * randomBetween(1.5, 2.1)),
+          new Vector3(cx + randomBetween(-spread, spread), cy + randomBetween(-spread * .6, spread * .5), cz + randomBetween(-spread, spread)),
+          1 - k * .04
+        );
+      }
     }
-
     if (ancient) {
       for (let j = 0; j < 4; j++) {
         const angle = j * Math.PI / 2 + random();
-        const root = MeshBuilder.CreateCylinder("tree-root", { height: 3.4 * scale, diameterTop: .10, diameterBottom: .6 * scale, tessellation: 6 }, scene);
-        root.position.set(x + Math.sin(angle) * 1.3 * scale, y + .6 * scale, z + Math.cos(angle) * 1.3 * scale);
+        const root = MeshBuilder.CreateCylinder("tree-root", { height: 3.4 * scaleFactor, diameterTop: .10, diameterBottom: .6 * scaleFactor, tessellation: 6 }, scene);
+        root.position.set(x + Math.sin(angle) * 1.3 * scaleFactor, y + .6 * scaleFactor, z + Math.cos(angle) * 1.3 * scaleFactor);
         root.rotation.z = Math.cos(angle) * .93;
         root.rotation.x = Math.sin(angle) * .93;
         root.material = barkDark;
+        root.isPickable = false;
       }
     }
   }
 
-  // Distant layered foliage also acts as a natural boundary for the demo.
   for (let i = 0; i < 116; i++) {
     let x = randomBetween(-93, 93);
     let z = randomBetween(-104, 105);
@@ -188,166 +322,219 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
   [
     [-24, -17, 1.45], [24, 5, 1.5], [-26, 45, 1.6], [26, 65, 1.65],
     [-21, 98, 1.7], [22, -55, 1.4], [-20, -77, 1.75]
-  ].forEach(([x, z, scale]) => treeAt(x, z, scale, true));
+  ].forEach(([x, z, s]) => treeAt(x, z, s, true));
+  // A dense tree wall beyond the playable bounds hides the world's edge.
+  for (let i = 0; i < 150; i++) {
+    const alongX = random() < .5;
+    const outward = randomBetween(2, 46);
+    const x = alongX ? (random() < .5 ? -1 : 1) * (TERRAIN.maxX - 4 + outward) : randomBetween(-150, 150);
+    const z = alongX ? randomBetween(-165, 165) : (random() < .5 ? -1 : 1) * (TERRAIN.maxZ - 6 + outward);
+    treeAt(x, z, randomBetween(1, 1.7), random() < .12, 0);
+  }
 
-  // Group hundreds of trunks into just two thin-instanced draw groups.
   trunkTransforms.forEach((transforms, i) => {
     const source = MeshBuilder.CreateCylinder("trunk-batch-" + i, {
       height: 1, diameterTop: .58, diameterBottom: 1.5, tessellation: 8
     }, scene);
     source.material = i === 1 ? barkDark : trunk;
     source.receiveShadows = true;
-    source.thinInstanceSetBuffer("matrix", packInstanceMatrices(transforms), 16, true);
-    source.thinInstanceRefreshBoundingInfo();
+    shadows.addShadowCaster(source);
+    instanceBatch(source, transforms);
   });
+  const coreSource = MeshBuilder.CreateIcoSphere("canopy-core-batch", { radius: 1, subdivisions: 2 }, scene);
+  coreSource.material = coreMaterial;
+  coreSource.receiveShadows = true;
+  shadows.addShadowCaster(coreSource);
+  instanceBatch(coreSource, coreTransforms);
 
-  // Batch the canopy as six groups rather than hundreds of individual meshes.
-  // Thin instances preserve varied silhouettes at substantially lower draw-call cost.
-  canopyTransforms.forEach((transforms, i) => {
-    const source = MeshBuilder.CreateIcoSphere("canopy-batch-" + i, { radius: 1, subdivisions: 2 }, scene);
-    source.material = leafMaterials[i];
-    source.receiveShadows = true;
-    source.thinInstanceSetBuffer("matrix", packInstanceMatrices(transforms), 16, true);
-    source.thinInstanceRefreshBoundingInfo();
-  });
+  // ---- Understory: ferns, bushes, grass and wildflowers -----------------
+  const nearHouse = (x: number, z: number) =>
+    HOUSES.some(([hx, hz, hs]) => Math.abs(x - hx) < 5.6 * hs && Math.abs(z - hz) < 5.4 * hs);
 
-  // Understory bushes: cheaper than detailed photo assets, but lots of depth.
-  const bushTransforms: Matrix[][] = bushMats.map(() => []);
-  for (let i = 0; i < 260; i++) {
+  const fernSource = createFernClumpMesh(scene, random);
+  fernSource.material = frondMaterial;
+  fernSource.receiveShadows = true;
+  const fernTransforms: Matrix[] = [];
+  const fernColors: number[] = [];
+  for (let i = 0; i < 560; i++) {
+    const z = randomBetween(-100, 106);
+    const nearTrail = random() < .65;
+    const side = random() > .5 ? 1 : -1;
+    const x = nearTrail ? pathCenter(z) + side * randomBetween(3.3, 15) : randomBetween(-92, 92);
+    if (Math.abs(x - pathCenter(z)) < 3 || nearHouse(x, z)) continue;
+    const size = nearTrail ? randomBetween(.9, 1.9) : randomBetween(.7, 1.5);
+    fernTransforms.push(Matrix.Compose(
+      new Vector3(size, size * randomBetween(.85, 1.2), size),
+      Quaternion.FromEulerAngles(0, random() * Math.PI * 2, 0),
+      new Vector3(x, groundHeight(x, z) - .02, z)
+    ));
+    fernColors.push(.78 + random() * .35, .88 + random() * .22, .7 + random() * .25, 1);
+  }
+  instanceBatch(fernSource, fernTransforms, fernColors);
+
+  for (let i = 0; i < 170; i++) {
     const x = randomBetween(-88, 88);
     const z = randomBetween(-100, 103);
-    if (Math.abs(x - pathCenter(z)) < 4.6) continue;
-    const radius = randomBetween(.38, 1.15);
-    const type = Math.floor(random() * bushMats.length);
-    bushTransforms[type].push(Matrix.Compose(
-      new Vector3(radius * 1.5, radius * .75, radius),
+    if (Math.abs(x - pathCenter(z)) < 4.6 || nearHouse(x, z)) continue;
+    const radius = randomBetween(.55, 1.2);
+    pushCluster(
+      new Vector3(radius * 1.5, radius * 1.05, radius * 1.4),
+      new Vector3(x, groundHeight(x, z) + radius * .45, z),
+      .78
+    );
+  }
+
+  const clusterSource = createLeafClusterMesh(scene, random);
+  clusterSource.material = leafMaterial;
+  clusterSource.receiveShadows = true;
+  // House vines are appended to the same batch later, so the batch is finalised after the houses.
+
+  const tuftSource = createGrassTuftMesh(scene);
+  tuftSource.material = grassMaterial;
+  tuftSource.receiveShadows = true;
+  const tuftTransforms: Matrix[] = [];
+  const tuftColors: number[] = [];
+  for (let i = 0; i < 9000 && tuftTransforms.length < 5200; i++) {
+    const z = randomBetween(-102, 106);
+    const nearTrail = random() < .7;
+    const x = nearTrail ? pathCenter(z) + (random() > .5 ? 1 : -1) * randomBetween(2.4, 30) : randomBetween(-92, 92);
+    if (Math.abs(x - pathCenter(z)) < 2.4 || nearHouse(x, z)) continue;
+    const size = randomBetween(.9, 2.0);
+    tuftTransforms.push(Matrix.Compose(
+      new Vector3(size, size * randomBetween(.8, 1.5), size),
       Quaternion.FromEulerAngles(0, random() * Math.PI * 2, 0),
-      new Vector3(x, groundHeight(x, z) + radius * .28, z)
+      new Vector3(x, groundHeight(x, z) - .02, z)
+    ));
+    tuftColors.push(.8 + random() * .35, .9 + random() * .2, .7 + random() * .25, 1);
+  }
+  instanceBatch(tuftSource, tuftTransforms, tuftColors);
+
+  const flowerSource = createFlowerPatchMesh(scene);
+  flowerSource.material = flowerMaterial;
+  const flowerTransforms: Matrix[] = [];
+  for (let i = 0; i < 380; i++) {
+    const z = randomBetween(-92, 102);
+    const x = pathCenter(z) + (random() > .5 ? 1 : -1) * randomBetween(3.2, 16);
+    if (nearHouse(x, z)) continue;
+    const size = randomBetween(.7, 1.5);
+    flowerTransforms.push(Matrix.Compose(
+      new Vector3(size, size, size),
+      Quaternion.FromEulerAngles(0, random() * Math.PI * 2, 0),
+      new Vector3(x, groundHeight(x, z), z)
     ));
   }
-  bushTransforms.forEach((transforms, i) => {
-    const source = MeshBuilder.CreateIcoSphere("bush-batch-" + i, { radius: 1, subdivisions: 1 }, scene);
-    source.material = bushMats[i];
-    source.thinInstanceSetBuffer("matrix", packInstanceMatrices(transforms), 16, true);
-    source.thinInstanceRefreshBoundingInfo();
-  });
+  instanceBatch(flowerSource, flowerTransforms);
 
-  // Thousands of foliage blades, rendered in only two thin-instance batches.
-  function grassLayer(name: string, hex: string, count: number, height: number) {
-    const blade = MeshBuilder.CreateCylinder(name, { height, diameterTop: .012, diameterBottom: .18, tessellation: 3 }, scene);
-    const bladeMat = material(scene, name + "-mat", hex);
-    bladeMat.backFaceCulling = false;
-    blade.material = bladeMat;
-    const transforms = new Float32Array(count * 16);
-    let filled = 0;
-    let attempts = 0;
-    while (filled < count && attempts < count * 8) {
-      attempts++;
-      const x = randomBetween(-91, 91);
-      const z = randomBetween(-100, 106);
-      if (Math.abs(x - pathCenter(z)) < 3.2) continue;
-      const size = randomBetween(.7, 1.75);
-      const matrix = Matrix.Compose(
-        new Vector3(size, size, size),
-        Quaternion.FromEulerAngles(randomBetween(-.23, .23), randomBetween(0, 6.28), randomBetween(-.18, .18)),
-        new Vector3(x, groundHeight(x, z) + height * size * .34, z)
-      );
-      matrix.copyToArray(transforms, filled * 16);
-      filled++;
-    }
-    blade.thinInstanceSetBuffer("matrix", transforms.subarray(0, filled * 16), 16, true);
-    blade.thinInstanceRefreshBoundingInfo();
-  }
-  grassLayer("sunlit-grass", "#679a4c", 2900, .56);
-  grassLayer("shadow-grass", "#3e7b45", 2400, .72);
+  // ---- Houses -----------------------------------------------------------
+  const accentVines: Array<{ at: Vector3; scale: number }> = [];
 
-  // Warm textured wood grain is produced by a tiny procedural canvas.
-  const woodTexture = new DynamicTexture("procedural-timber-grain", { width: 256, height: 256 }, scene, false);
-  const context = woodTexture.getContext();
-  context.fillStyle = "#a38a66";
-  context.fillRect(0, 0, 256, 256);
-  for (let i = 0; i < 55; i++) {
-    const y = random() * 256;
-    context.fillStyle = i % 3 === 0 ? "#73573b" : "#c1a17c";
-    context.fillRect(0, y, 256, randomBetween(1, 3));
-  }
-  for (let i = 0; i < 9; i++) {
-    const y = i * 32;
-    context.fillStyle = "#654b38";
-    context.fillRect(0, y, 256, 3);
-  }
-  woodTexture.update();
-  wood.diffuseTexture = woodTexture;
-
-  // Wooden houses are intentionally modular. These primitives will be
-  // swapped for authored glTF village modules during art production.
-  function createHouse(x: number, z: number, side: 1 | -1, size = 1) {
+  function createHouse(x: number, z: number, s: number, awning: boolean) {
     const y = groundHeight(x, z);
-    const s = size;
-    const roofY = y + 4.65 * s;
-    const main = box(scene, "timber-cottage", 6.6 * s, 3.8 * s, 6.1 * s, x, y + 2.0 * s, z, wood, shadows);
-    main.receiveShadows = true;
-    blockers.push({ x, z, rx: 3.25 * s, rz: 3.05 * s });
+    const root = new TransformNode("house-root", scene);
+    root.position.set(x, y, z);
+    // Local +Z is the front: turn the house to face the trail.
+    root.lookAt(new Vector3(pathCenter(z), y, z));
+    root.computeWorldMatrix(true);
+    const parts: Mesh[] = [];
+    const b = (name: string, w: number, h: number, d: number, px: number, py: number, pz: number, mat: StandardMaterial) =>
+      box(scene, name, w * s, h * s, d * s, px * s, py * s, pz * s, mat, { parent: root, parts });
 
-    // Exposed beams and balcony railings.
-    for (const dx of [-3.2, 3.2]) {
-      for (const dz of [-2.9, 2.9]) {
-        box(scene, "corner-pillar", .25 * s, 4.25 * s, .29 * s, x + dx * s, y + 2.12 * s, z + dz * s, beams);
-      }
+    b("stone-foundation", 7.0, .7, 6.5, 0, .35, 0, stoneDark);
+    b("lower-wall", 6.4, 2.5, 5.9, 0, 1.95, 0, wood);
+    for (const dx of [-3.2, 3.2]) for (const dz of [-2.95, 2.95]) b("corner-pillar", .3, 2.7, .3, dx, 2.05, dz, beams);
+    b("floor-beam", 7.3, .26, 6.7, 0, 3.35, 0, beams);
+    b("upper-wall", 7.0, 2.3, 6.4, 0, 4.62, 0, woodUpper);
+    for (const dx of [-3.5, 3.5]) for (const dz of [-3.2, 3.2]) b("upper-pillar", .28, 2.4, .28, dx, 4.6, dz, beams);
+    b("eave-beam", 7.4, .22, 6.8, 0, 5.85, 0, beams);
+
+    // Front door and windows (+Z).
+    b("door-frame", 1.9, .2, .24, 0, 3.05, 3.0, beams);
+    b("arched-door", 1.5, 2.3, .16, 0, 1.85, 2.98, beams);
+    for (const dx of [-2.0, 2.0]) {
+      b("window-opening", 1.1, 1.0, .12, dx, 2.2, 2.99, beams);
+      b("window-glow", .78, .7, .13, dx, 2.2, 3.04, lantern);
+      b("window-bar", .07, .96, .16, dx, 2.2, 3.1, beams);
     }
-    for (const yy of [1, 3.55]) {
-      box(scene, "horizontal-beam", 6.8 * s, .19 * s, .28 * s, x, y + yy * s, z - 3.12 * s, beams);
+    for (const dx of [-2.1, 0, 2.1]) {
+      b("window-opening", 1.0, 1.0, .12, dx, 4.75, 3.2, beams);
+      b("window-glow", .72, .7, .13, dx, 4.75, 3.25, lantern);
+      b("window-bar", .07, .96, .16, dx, 4.75, 3.31, beams);
     }
 
-    const roofL = box(scene, "left-thatched-roof", 4.4 * s, .33 * s, 7.4 * s, x - 1.70 * s, roofY, z, roof, shadows);
-    const roofR = box(scene, "right-thatched-roof", 4.4 * s, .33 * s, 7.4 * s, x + 1.70 * s, roofY, z, roof, shadows);
-    roofL.rotation.z = .43; roofR.rotation.z = -.43;
-    for (const dx of [-2.5, -1, 1, 2.5]) {
-      const ridge = box(scene, "roof-thatch-detail", .11 * s, .08 * s, 7.6 * s, x + dx * s, roofY + (.7 - Math.abs(dx) * .18) * s, z, roofLight);
-      ridge.rotation.z = dx < 0 ? .43 : -.43;
+    // Raised balcony on stilts across the front of the upper floor.
+    b("balcony-floor", 4.6, .16, 1.5, 0, 3.55, 3.95, beams);
+    for (const dx of [-2.2, 2.2]) {
+      b("balcony-stilt", .22, 3.5, .22, dx, 1.75, 4.6, beams);
+      b("balcony-rail-post", .12, .95, .12, dx, 4.1, 4.62, beams);
     }
-    const front = z - 3.13 * s;
-    box(scene, "arched-door", 1.48 * s, 2.34 * s, .14 * s, x, y + 1.2 * s, front, beams);
-    for (const dx of [-2.18, 2.18]) {
-      box(scene, "window-opening", 1.15 * s, 1.10 * s, .12 * s, x + dx * s, y + 2.35 * s, front - .06 * s, barkDark);
-      box(scene, "window-glow", .79 * s, .77 * s, .13 * s, x + dx * s, y + 2.35 * s, front - .17 * s, lantern);
-      box(scene, "window-cross", .09 * s, .98 * s, .18 * s, x + dx * s, y + 2.35 * s, front - .26 * s, beams);
-      box(scene, "window-cross", 1.05 * s, .09 * s, .18 * s, x + dx * s, y + 2.35 * s, front - .26 * s, beams);
+    b("balcony-rail", 4.6, .1, .1, 0, 4.55, 4.62, beams);
+    for (let i = 0; i < 3; i++) b("porch-step", 2.2, .14, .45, 0, .2 + i * .1, 3.35 + i * .45, stoneDark);
+
+    // Roof: two thatched slabs with deep eaves, ridge cap and gable ends.
+    const tilt = .52;
+    const roofL = b("thatch-roof-left", 4.73, .3, 7.6, -2.05, 6.88, 0, roof);
+    const roofR = b("thatch-roof-right", 4.73, .3, 7.6, 2.05, 6.88, 0, roof);
+    roofL.rotation.z = tilt;
+    roofR.rotation.z = -tilt;
+    b("ridge-cap", .4, .3, 7.8, 0, 8.05, 0, beams);
+    for (const dz of [-3.2, 3.2]) {
+      const gable = gablePrism(scene, "gable-end", 3.55 * s, 2.03 * s, .3 * s);
+      gable.material = wood;
+      gable.receiveShadows = true;
+      gable.parent = root;
+      gable.position.set(0, 5.96 * s, dz * s);
+      parts.push(gable);
     }
-    // Raised entry boards and foliage-bound supports.
-    for (let i = 0; i < 3; i++) box(scene, "porch-step", 2.2 * s, .14 * s, .45 * s, x, y + .17 * s + i * .055, front - .45 * s - i * .45 * s, roofLight);
-    for (let i = 0; i < 5; i++) {
-      const hanging = MeshBuilder.CreateSphere("hanging-vines", { diameter: .44 * s, segments: 6 }, scene);
-      hanging.position.set(x + (-2.7 + i * 1.35) * s, roofY - .64 * s - random() * .45, front + .22 * s);
-      hanging.scaling.y = randomBetween(1.4, 2.8);
-      hanging.material = bushMats[i % bushMats.length];
+
+    // Cloth banners, door awning and hanging lanterns.
+    for (const dx of [-3.0, 3.0]) b("hanging-banner", .95, 2.2, .05, dx, 2.3, 3.45, dx < 0 ? clothBlue : clothCream);
+    if (awning) {
+      const awn = b("door-awning", 2.8, .1, 1.5, 0, 3.15, 3.7, clothBlue);
+      awn.rotation.x = .28;
     }
-    // Low market awning attached to the front of the house.
-    if (side === 1) {
-      const awning = box(scene, "market-awning", 5.0 * s, .12 * s, 2.45 * s, x, y + 2.65 * s, front - 1.4 * s, flag);
-      awning.rotation.x = -.08;
-      for (const dx of [-2.35, 2.35]) {
-        box(scene, "awning-post", .13 * s, 2.63 * s, .13 * s, x + dx * s, y + 1.30 * s, front - 2.40 * s, beams);
-      }
+    for (const dx of [-1.3, 1.3]) {
+      b("lantern-cord", .04, .4, .04, dx, 3.0, 3.25, beams);
+      b("hanging-lantern", .3, .42, .3, dx, 2.7, 3.25, lantern);
     }
+
+    // Houses face the trail, so their depth (incl. balcony stilts) runs along world X.
+    blockers.push({ x, z, rx: 5.1 * s, rz: 3.9 * s });
+
+    const world = root.getWorldMatrix();
+    for (const [lx, ly, lz, sc] of [
+      [-3.9, 5.7, 2.4, .8], [3.9, 5.7, -1.2, .8], [-3.9, 5.6, -2.6, .7], [3.9, 5.6, 2.8, .75],
+      [-2.4, 3.1, 3.45, .5], [2.4, 3.1, 3.45, .5], [0, 7.9, 3.3, .6], [0, 7.9, -3.3, .6]
+    ]) {
+      accentVines.push({ at: Vector3.TransformCoordinates(new Vector3(lx * s, ly * s, lz * s), world), scale: sc * s });
+    }
+
+    const merged = Mesh.MergeMeshes(parts, true, true, undefined, false, true);
+    if (merged) {
+      merged.name = "timber-house";
+      merged.receiveShadows = true;
+      merged.isPickable = false;
+      shadows.addShadowCaster(merged);
+    }
+    root.dispose();
   }
+  HOUSES.forEach(([x, z, s, awning]) => createHouse(x, z, s, awning));
 
-  createHouse(-13.5, 12, -1, 1.08);
-  createHouse(13.2, 21, 1, .98);
-  createHouse(-14.5, 40, 1, 1.15);
-  createHouse(14.7, 55, 1, 1.05);
-  createHouse(-13.3, 74, -1, .92);
-  createHouse(14.2, 87, -1, 1.09);
+  for (const vine of accentVines) {
+    pushCluster(new Vector3(vine.scale * 1.7, vine.scale * 1.4, vine.scale * 1.7), vine.at, .9);
+  }
+  instanceBatch(clusterSource, clusterTransforms, clusterColors);
 
-  // Market crates, planters and travel supplies bring scale and interest.
+  // ---- Market props -----------------------------------------------------
   function barrel(x: number, z: number) {
     const y = groundHeight(x, z);
     const b = MeshBuilder.CreateCylinder("market-barrel", { height: 1.13, diameter: .8, tessellation: 12 }, scene);
     b.position.set(x, y + .58, z);
     b.material = wood;
+    b.receiveShadows = true;
+    shadows.addShadowCaster(b);
     box(scene, "barrel-band", .86, .10, .86, x, y + .25, z, beams);
   }
-  for (const [x, z] of [[-7, 13],[-6, 15],[6, 22],[9, 51],[-9, 42],[7, 88],[-7, 74]]) {
+  for (const [x, z] of [[-7, 13], [-6, 15], [6, 22], [9, 51], [-9, 42], [7, 88], [-7, 74]]) {
     barrel(x, z);
     stoneAt(x + 1.7, z + 1.4, randomBetween(.3, .9));
   }
@@ -356,23 +543,17 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
     const x = pathCenter(z) + (random() > .5 ? 1 : -1) * randomBetween(4.1, 7.8);
     stoneAt(x, z, randomBetween(.14, .65));
   }
-
-  // Draw scattered rocks in two material groups instead of issuing a draw
-  // for every boulder. The old geometry and placement remain unchanged.
   rockTransforms.forEach((transforms, i) => {
-    const rock = MeshBuilder.CreateIcoSphere("forest-rocks-instanced-" + i, {
-      radius: 1, subdivisions: 1
-    }, scene);
+    const rock = MeshBuilder.CreateIcoSphere("forest-rocks-instanced-" + i, { radius: 1, subdivisions: 1 }, scene);
     rock.material = i === 0 ? stone : stoneDark;
     rock.receiveShadows = true;
-    rock.thinInstanceSetBuffer("matrix", packInstanceMatrices(transforms), 16, true);
-    rock.thinInstanceRefreshBoundingInfo();
+    shadows.addShadowCaster(rock);
+    instanceBatch(rock, transforms);
   });
 
-  // A soft warm lantern rhythm makes the forest path readable at dusk.
   function lightPost(x: number, z: number) {
     const y = groundHeight(x, z);
-    box(scene, "lantern-post", .15, 3.7, .15, x, y + 1.85, z, beams);
+    box(scene, "lantern-post", .15, 3.7, .15, x, y + 1.85, z, beams, { shadows });
     box(scene, "lantern-arm", 1.12, .13, .14, x + .48, y + 3.48, z, beams);
     box(scene, "lantern-frame", .50, .64, .50, x + .94, y + 3.02, z, gold);
     const bulb = box(scene, "lantern-core", .34, .47, .35, x + .94, y + 3.02, z, lantern);
@@ -380,7 +561,7 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
   }
   for (const z of [-35, -12, 12, 35, 62, 83]) lightPost(pathCenter(z) + 5.6, z);
 
-  // Handcrafted test landmark, independent from the future story.
+  // ---- Shrine landmark --------------------------------------------------
   const altarZ = 101;
   const altarX = pathCenter(altarZ);
   const altarY = groundHeight(altarX, altarZ);
@@ -411,9 +592,9 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
 
   function noticeBoard(x: number, z: number) {
     const y = groundHeight(x, z);
-    for (const dx of [-.9, .9]) box(scene, "signpost", .15, 2.9, .16, x + dx, y + 1.47, z, beams);
-    box(scene, "village-sign", 2.4, 1.08, .18, x, y + 2.35, z, wood);
-    box(scene, "village-sign-top", 2.7, .13, .24, x, y + 2.92, z, roofLight);
+    for (const dx of [-.9, .9]) box(scene, "signpost", .15, 2.9, .16, x + dx, y + 1.47, z, beams, { shadows });
+    box(scene, "village-sign", 2.4, 1.08, .18, x, y + 2.35, z, wood, { shadows });
+    box(scene, "village-sign-top", 2.7, .13, .24, x, y + 2.92, z, roof);
   }
   noticeBoard(5.7, -23);
   interactions.push({
@@ -428,23 +609,12 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
     position: new Vector3(-5.6, groundHeight(-5.6, 49), 49)
   });
 
-  // River-colored decorative flower clusters at village edges.
-  const blossomColors = ["#ffe5d5", "#f7f0d1", "#e3c9ef"].map((hex, i) => material(scene, "blossom-" + i, hex));
-  for (let i = 0; i < 120; i++) {
-    const z = randomBetween(-85, 102);
-    const x = pathCenter(z) + (random() > .5 ? 1 : -1) * randomBetween(4.6, 18);
-    const flower = MeshBuilder.CreateSphere("tiny-wildflower", { diameter: randomBetween(.09, .21), segments: 5 }, scene);
-    flower.position.set(x, groundHeight(x, z) + randomBetween(.34, .65), z);
-    flower.material = blossomColors[Math.floor(random() * blossomColors.length)];
-  }
-
   // The separately authored theme is completely modular: scenery, location
   // interactions and broad-phase blockers are added without changing the player.
   const lankaTheme = createLankaTheme(scene, shadows, groundHeight);
   blockers.push(...lankaTheme.blockers);
   interactions.push(...lankaTheme.interactions);
 
-  // Lanterns remain visible during daytime, then gain contrast at night.
   let isNight = false;
   return {
     addBlocker(x, z, rx, rz) { blockers.push({ x, z, rx, rz }); },
@@ -465,11 +635,10 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
     setNight(night) {
       if (isNight === night) return;
       isNight = night;
-      lantern.emissiveColor = night ? color("#ffe49b") : color("#ae7b3b");
-      shrineLight.emissiveColor = night ? color("#5bf1d7") : color("#259b95");
-      glow.intensity = night ? 1.0 : .58;
-      cloth.alpha = night ? .82 : .9;
-      earth.alpha = 1;
+      // HDR emissive values: warm windows and lanterns bloom after dusk.
+      lantern.emissiveColor = night ? new Color3(2.6, 1.8, .85) : new Color3(1.5, 1.05, .5);
+      shrineLight.emissiveColor = night ? new Color3(.35, 1.2, .95) : new Color3(.2, .7, .66);
+      glow.intensity = night ? .9 : .5;
       lankaTheme.setNight(night);
     },
   };
