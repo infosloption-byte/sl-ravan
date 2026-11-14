@@ -1,5 +1,5 @@
 import { DynamicTexture, type Scene } from "@babylonjs/core";
-import { buildTileableNormalMap, clamp01, fbm, mulberry32, smoothstep } from "./Noise";
+import { buildTileableNormalMap, clamp01, fbm, mulberry32, smoothstep, tileableHeight } from "./Noise";
 import { paintGroundPixels, type TerrainBounds } from "./TerrainPaint";
 
 /**
@@ -45,10 +45,10 @@ export function createFrondTexture(scene: Scene): DynamicTexture {
         const tipX = cx + side * span;
         const tipY = y - lift;
         const gradient = ctx.createLinearGradient(cx, y, tipX, tipY);
-        const hue = 100 + R() * 18;
-        gradient.addColorStop(0, `hsl(${hue}, 55%, 17%)`);
-        gradient.addColorStop(.55, `hsl(${hue + 4}, 50%, 30%)`);
-        gradient.addColorStop(1, `hsl(${hue + 10}, 52%, ${44 + R() * 8}%)`);
+        const hue = 92 + R() * 20;
+        gradient.addColorStop(0, `hsl(${hue}, 50%, 24%)`);
+        gradient.addColorStop(.55, `hsl(${hue + 4}, 46%, 40%)`);
+        gradient.addColorStop(1, `hsl(${hue + 10}, 50%, ${54 + R() * 8}%)`);
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.moveTo(cx, y);
@@ -78,11 +78,11 @@ export function createLeafTexture(scene: Scene): DynamicTexture {
       const y = h / 2 + Math.sin(angle) * radius;
       const length = w * (.15 + R() * .1);
       const width = length * .42;
-      const lightness = 20 + (1 - radius / (w * .4)) * 8 + (y < h / 2 ? 9 : 0) + R() * 12;
+      const lightness = 27 + (1 - radius / (w * .4)) * 8 + (y < h / 2 ? 10 : 0) + R() * 12;
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(R() * Math.PI * 2);
-      ctx.fillStyle = `hsl(${92 + R() * 34}, ${48 + R() * 14}%, ${lightness}%)`;
+      ctx.fillStyle = `hsl(${86 + R() * 30}, ${44 + R() * 12}%, ${lightness}%)`;
       ctx.beginPath();
       ctx.moveTo(-length / 2, 0);
       ctx.quadraticCurveTo(0, -width, length / 2, 0);
@@ -103,15 +103,15 @@ export function createGrassTexture(scene: Scene): DynamicTexture {
   return makeTexture(scene, "grass-tuft", 128, 256, (ctx, w, h) => {
     const R = mulberry32(303);
     ctx.clearRect(0, 0, w, h);
-    for (let i = 0; i < 22; i++) {
+    for (let i = 0; i < 17; i++) {
       const baseX = w / 2 + (R() - .5) * w * .55;
       const tipX = baseX + (R() - .5) * w * .7;
       const tipY = h * (.04 + R() * .5);
-      const half = 3 + R() * 3;
+      const half = 4 + R() * 4;
       const gradient = ctx.createLinearGradient(baseX, h, tipX, tipY);
-      const hue = 88 + R() * 30;
-      gradient.addColorStop(0, `hsl(${hue}, 55%, 16%)`);
-      gradient.addColorStop(1, `hsl(${hue + 6}, 55%, ${34 + R() * 14}%)`);
+      const hue = 82 + R() * 28;
+      gradient.addColorStop(0, `hsl(${hue}, 48%, 26%)`);
+      gradient.addColorStop(1, `hsl(${hue + 6}, 52%, ${46 + R() * 16}%)`);
       ctx.fillStyle = gradient;
       ctx.beginPath();
       ctx.moveTo(baseX - half, h);
@@ -332,4 +332,27 @@ export function createGroundNormalMap(scene: Scene, size = 256): DynamicTexture 
     image.data.set(buildTileableNormalMap(size));
     ctx.putImageData(image, 0, 0);
   }, { aniso: 4 });
+}
+
+/**
+ * Tiled fine-grain layer for Babylon's detail map: red modulates the albedo,
+ * green/blue carry a tangent-space normal. Tiled ~1 m so the ground stays
+ * sharp up close where the single baked albedo would be magnified and blurry.
+ */
+export function createGroundDetailTexture(scene: Scene, size = 256): DynamicTexture {
+  return makeTexture(scene, "forest-ground-detail", size, size, (ctx) => {
+    const normals = buildTileableNormalMap(size, 3.2, 8);
+    const image = ctx.createImageData(size, size);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const i = (y * size + x) * 4;
+        const grain = tileableHeight(x, y, size, 19);
+        image.data[i] = (.5 + (grain - .5) * .8) * 255;
+        image.data[i + 1] = normals[i];
+        image.data[i + 2] = normals[i + 1];
+        image.data[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(image, 0, 0);
+  }, { aniso: 8 });
 }

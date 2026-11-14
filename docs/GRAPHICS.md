@@ -22,6 +22,17 @@ houses with thatch roofs, soft golden light, haze and depth).
 
 All art is generated in code; nothing is copied from any game. `ForestSurface.ts` is no longer used by `World.ts`.
 
+## Pass 2 (after first in-browser screenshot)
+
+- Brighter, softer grade: higher exposure/ambient, lower contrast, lighter vignette, less saturation, lighter greens.
+- Performance: foliage/canopy thin instances are split into 48 m chunks so off-screen chunks are culled;
+  2 shadow cascades (max 90 m); wall trees no longer cast shadows; cheaper canopy cores and glow layer; MSAA 2x.
+- Quality ladder: when FPS stays under 34 the game drops MSAA, then bloom/sharpen cost, and only then
+  lowers resolution (capped at 1.5x) so the image stays sharp as long as possible.
+- Ground: tiled detail map (about 1.25 m tiles) over the baked albedo, softer and less yellow leaf litter.
+- Foliage: lighter, wider grass blades, lighter ferns/leaves, faint backlight glow.
+- Not done yet: wind sway, authored character/house/tree models, SSAO.
+
 ## Must be checked in a real browser (not verified by automated tests)
 
 Run `npm run typecheck`, `npm test`, `npm run build`, then open the scene and confirm:
@@ -31,6 +42,7 @@ Run `npm run typecheck`, `npm test`, `npm run build`, then open the scene and co
 - House gables and roofs are visible from outside; houses face the trail; collision matches the footprint.
 - Sky, haze, shafts, bloom look right at day and night; pollen/fireflies visible.
 - Shadows are stable while moving; FPS acceptable (adaptive scaling lowers resolution if not).
+- Ground shows the sharp detail layer up close (if the detail map is unsupported it silently falls back to the baked albedo).
 - Startup time: the ground bake is the main one-off CPU cost (~1–2 s).
 - Save/load, day/night toggle, scene teardown and relaunch still work.
 

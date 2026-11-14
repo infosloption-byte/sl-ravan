@@ -82,16 +82,16 @@ export class RavanGame {
     let shadows: ShadowGenerator;
     try {
       const cascaded = new CascadedShadowGenerator(2048, this.sun, undefined, this.camera);
-      cascaded.numCascades = 3;
-      cascaded.lambda = .8;
-      cascaded.shadowMaxZ = 120;
+      cascaded.numCascades = 2;
+      cascaded.lambda = .75;
+      cascaded.shadowMaxZ = 90;
       cascaded.stabilizeCascades = true;
       cascaded.autoCalcDepthBounds = false;
       cascaded.usePercentageCloserFiltering = true;
       cascaded.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
       cascaded.bias = .001;
       cascaded.normalBias = .02;
-      cascaded.setDarkness(.3);
+      cascaded.setDarkness(.45);
       shadows = cascaded;
     } catch (error) {
       console.warn("SL Ravan: cascaded shadows unavailable; using a single shadow map", error);
@@ -229,7 +229,7 @@ export class RavanGame {
     if (this.saveTime > 12) { this.saveTime = 0; this.save(); }
   }
 
-  /** Lowers the render resolution step by step when the frame rate stays poor. */
+  /** When the frame rate stays poor: drop effects first, then resolution (capped at 1.5x). */
   private adaptResolution(rawDt: number) {
     this.perfWarmup += rawDt;
     if (this.perfWarmup < 5) return; // ignore shader compilation and texture upload
@@ -239,8 +239,11 @@ export class RavanGame {
     const fps = this.perfFrames / this.perfTime;
     this.perfTime = 0;
     this.perfFrames = 0;
-    if (fps < 36 && this.renderScale < 2) {
-      this.renderScale = Math.min(2, this.renderScale + .25);
+    if (fps >= 34) return;
+    // Drop expensive effects first; only then trade away sharpness.
+    if (this.atmosphere.reduceQuality()) return;
+    if (this.renderScale < 1.5) {
+      this.renderScale = Math.min(1.5, this.renderScale + .25);
       this.engine.setHardwareScalingLevel(this.renderScale);
     }
   }

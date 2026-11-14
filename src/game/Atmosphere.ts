@@ -17,6 +17,8 @@ export interface ShaftAnchor { x: number; y: number; z: number }
 export interface Atmosphere {
   setNight(night: boolean, instant?: boolean): void;
   update(dt: number, focus: Vector3): void;
+  /** Drops one expensive effect. Returns false once nothing is left to drop. */
+  reduceQuality(): boolean;
   dispose(): void;
 }
 
@@ -34,9 +36,9 @@ const c3 = (hex: string) => Color3.FromHexString(hex);
 
 const DAY: Palette = {
   top: c3("#4f8fbd"), horizon: c3("#bfd8c6"), sunGlow: c3("#ffe0a0"),
-  sunLight: c3("#ffe1ad"), sunIntensity: 2.2,
-  ambientSky: c3("#d3ead9"), ambientGround: c3("#7a6844"), ambientIntensity: .72,
-  exposure: 1.08, bloom: .34, fogDensity: .0040,
+  sunLight: c3("#ffe3b3"), sunIntensity: 2.0,
+  ambientSky: c3("#d3ead9"), ambientGround: c3("#7a6844"), ambientIntensity: .98,
+  exposure: 1.3, bloom: .3, fogDensity: .0034,
   hillNear: c3("#5f8d73"), hillFar: c3("#86aa9a"),
   shafts: .17, stars: 0, cloud: .75,
   pollen: new Color4(1, .93, .62, .55), pollenRate: 26,
@@ -146,6 +148,7 @@ export function createAtmosphere(
   const current = clonePalette(DAY);
   let goal = DAY;
   let time = 0;
+  let quality = 0;
 
   scene.fogMode = Scene.FOGMODE_EXP2;
 
@@ -252,7 +255,7 @@ export function createAtmosphere(
   pipeline.fxaaEnabled = renderEngine instanceof Engine && renderEngine.webGLVersion < 2;
   pipeline.bloomEnabled = true;
   pipeline.bloomThreshold = .8;
-  pipeline.bloomKernel = 56;
+  pipeline.bloomKernel = 40;
   pipeline.bloomScale = .5;
   pipeline.sharpenEnabled = true;
   pipeline.sharpen.edgeAmount = .2;
@@ -260,16 +263,16 @@ export function createAtmosphere(
   const ip = pipeline.imageProcessing;
   ip.toneMappingEnabled = true;
   ip.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES;
-  ip.contrast = 1.12;
+  ip.contrast = 1.04;
   ip.vignetteEnabled = true;
-  ip.vignetteWeight = 1.7;
+  ip.vignetteWeight = .8;
   ip.vignetteStretch = .3;
   ip.vignetteColor = new Color4(.02, .05, .04, 0);
   ip.colorCurvesEnabled = true;
   const curves = new ColorCurves();
-  curves.globalSaturation = 24;
+  curves.globalSaturation = 8;
   curves.shadowsHue = 185;
-  curves.shadowsDensity = 22;
+  curves.shadowsDensity = 14;
   curves.shadowsSaturation = 18;
   curves.highlightsHue = 48;
   curves.highlightsDensity = 18;
@@ -317,6 +320,21 @@ export function createAtmosphere(
       apply();
       sky.setFloat("time", time);
       emitter.copyFrom(focus);
+    },
+    reduceQuality() {
+      quality++;
+      if (quality === 1) {
+        pipeline.samples = 1;
+        pipeline.fxaaEnabled = true;
+        return true;
+      }
+      if (quality === 2) {
+        pipeline.sharpenEnabled = false;
+        pipeline.bloomScale = .25;
+        pipeline.bloomKernel = 24;
+        return true;
+      }
+      return false;
     },
     dispose() {
       motes.dispose();

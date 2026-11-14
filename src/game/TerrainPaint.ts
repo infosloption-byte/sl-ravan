@@ -14,18 +14,18 @@ import { fbm, hash2, lerp, smoothstep, valueNoise } from "./Noise";
 export interface TerrainBounds { minX: number; maxX: number; minZ: number; maxZ: number }
 export type RGB = [number, number, number];
 
-const GRASS_DARK: RGB = [.12, .29, .14];
-const GRASS_MID: RGB = [.22, .45, .16];
-const GRASS_LIGHT: RGB = [.42, .62, .22];
-const GRASS_DRY: RGB = [.56, .58, .25];
-const MOSS: RGB = [.15, .37, .22];
+const GRASS_DARK: RGB = [.17, .36, .16];
+const GRASS_MID: RGB = [.31, .53, .18];
+const GRASS_LIGHT: RGB = [.52, .69, .25];
+const GRASS_DRY: RGB = [.62, .62, .29];
+const MOSS: RGB = [.2, .42, .24];
 const DIRT_DARK: RGB = [.33, .23, .14];
 const DIRT_LIGHT: RGB = [.58, .44, .28];
 const TRAMPLED: RGB = [.45, .40, .20];
 const OUTER_TINT: RGB = [.12, .26, .17];
 const PEBBLE: RGB = [.64, .62, .56];
 const CLOVER: RGB = [.92, .92, .82];
-const LITTER: RGB[] = [[.66, .40, .13], [.46, .27, .10], [.72, .60, .20]];
+const LITTER: RGB[] = [[.6, .42, .2], [.46, .33, .16], [.55, .5, .24]];
 
 /** Number of floats in a low-frequency sample: grass RGB then dirt RGB. */
 const LF = 6;
@@ -74,7 +74,7 @@ function shadeGround(
 
   const clover = speck > .985;
   const pebble = speck > .93;
-  const litter = speck > .955 && d < 14
+  const litter = speck > .975 && d < 14
     ? LITTER[Math.floor(hash2(cellX, cellZ, 11) * LITTER.length)]
     : null;
   const outer = smoothstep(46, 95, Math.abs(x));
@@ -89,7 +89,7 @@ function shadeGround(
       v = lerp(v, dirt, pathMask);
       v = lerp(v, lerp(lf[c] * gShade, TRAMPLED[c], .5), fringe);
     }
-    if (litter) v = lerp(v, litter[c], .7);
+    if (litter) v = lerp(v, litter[c], .45);
     out[o + c] = lerp(v, OUTER_TINT[c], outer * .3) * outerShade;
   }
 }
