@@ -114,3 +114,35 @@ The optional GLB loader also checks whether the game has been disposed before at
 A new blank/startup error appeared immediately after the experimental Babylon ES6 deep-import refactor. The branch has restored the former broad `@babylonjs/core` imports for compatibility with rendering, materials, shaders, mesh creation and glTF loading. This prioritizes working gameplay over bundle-size optimization. Do not reintroduce deep imports without browser smoke tests and required Babylon side-effect registrations.
 
 The launcher now shows the actual caught error message, writes the full exception to the F12 developer console and offers a **Retry Graphics** control. Test the full scene, including GLB 2/2, after pulling and restarting Vite. If the error persists, copy the **first red console error and stack trace** rather than just sending the generic error overlay.
+
+## Forest-village visual slice plan (Milestone 6)
+
+We are shifting from basic procedural low-poly scenery to ONE art-directed, high-fidelity forest village lane. Start from the user's visual reference: detailed tropical foliage, richly textured wooden houses, an irregular winding earth road, a believable traveler, and atmospheric golden sun.
+
+Planning details and quality gates: docs/FOREST_VILLAGE_VISUAL_SLICE.md.
+Structured layout and asset inventory: content/visual-slice/forest-village.json.
+Asset provenance requirements: docs/ASSET_LICENSE_REGISTER.md.
+
+Before touching rendering code, confirm the current draft PR #1 branch starts in the browser without a graphics error. Then source/author and validate one excellent GLB hero tree; build the first polished lane only after that art benchmark is accepted.
+
+Run npm run plan:validate to check scene-manifest consistency, and npm run test:plan to execute four Node-native manifest tests. npm test includes the plan checks alongside existing gameplay and GLB tests.
+
+This commit is a plan and validation scaffold: it does NOT include new high-resolution assets or a realistic scene yet.
+
+## Forest village — real asset integration (Gate A)
+
+New: a standalone [Art Lab](?artlab) for orbiting and inspecting local or installed GLB assets without affecting gameplay. Use the browser route `/?artlab`. The main game loads an optional licensed hero-tree GLB from `public/assets/visual-slice/vegetation/hero-tree.glb` and safely falls back to procedural art if absent.
+
+The installed hero-tree must pass structural/texture/triangle checks and have a source/rights record. See [docs/HERO_TREE_IMPORT.md](docs/HERO_TREE_IMPORT.md). `npm run test:asset-quality` adds four Node unit tests to the existing 24 baseline tests. The **realistic source asset has not been installed** by this commit; the current in-game graphics will look the same until a verified detailed model is imported.
+
+### Optional detailed tree preview
+
+Run npm run art:fetch-candidate to retrieve the CC0 Poly Haven Jacaranda 1K glTF and texture dependencies for Art Lab preview only (90 MiB download cap). Then visit /?artlab and choose Poly Haven Jacaranda candidate. A downloaded model is not yet approved or loaded into the game. See docs/HERO_TREE_IMPORT.md for optimization and promotion instructions.
+
+### Preparing downloaded hero tree
+
+After `npm run art:fetch-candidate`, optionally run `npm run art:prepare-candidate` (requires Blender 4.x installed and on PATH, or set BLENDER_BIN to its executable). This exports one self-contained, optimized-to-first-budget GLB from the downloaded glTF, validates it and copies it into the game's optional hero-tree slot. It records source/sha256 but does not mark visual approval. See `docs/HERO_TREE_IMPORT.md`.
+
+### Poly Haven 1K package larger than 90 MiB
+
+The source downloader now examines the **actual glTF buffer and image references**, rather than rejecting all files listed by the API. First run `npm run art:candidate-size` to inspect metadata without downloading. Then run `npm run art:fetch-candidate`. If the required dependencies remain too large, it reports their sizes and offers an explicitly bounded `npm run art:fetch-candidate -- --max-mib=256` option for local Blender conversion only (absolute cap 512 MiB). This does not relax the final browser GLB/performance budgets. Download and conversion remain unverified until run locally.

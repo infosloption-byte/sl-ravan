@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "id": "forest-village-slice",
+  "status": "planned",
+  "originalReference": "User-supplied screenshot used only as visual/quality guide, not a model or texture source",
+  "units": "m",
+  "axes": "x-right-y-up-z-forward",
+  "bounds": {
+    "minX": -27.5,
+    "maxX": 27.5,
+    "minZ": -45,
+    "maxZ": 45
+  },
+  "heroShot": {
+    "id": "village-lane",
+    "aspect": "16:9",
+    "camera": [
+      0,
+      3.2,
+      -37
+    ],
+    "target": [
+      0,
+      1.7,
+      10
+    ],
+    "direction": "+z",
+    "note": "Follow player, frame cottage facades on either side, hazy light down curving path"
+  },
+  "zones": [
+    {
+      "id": "forest-entry",
+      "z": [
+        -45,
+        -15
+      ],
+      "objective": "Dense ferns and canopy framing"
+    },
+    {
+      "id": "village-lane",
+      "z": [
+        -15,
+        25
+      ],
+      "objective": "Curved path, village facades, awnings and clutter"
+    },
+    {
+      "id": "light-clearing",
+      "z": [
+        25,
+        45
+      ],
+      "objective": "Depth haze and sunlit foliage"
+    }
+  ],
+  "requiredAssets": [
+    {
+      "id": "tree-hero",
+      "kind": "glb",
+      "priority": "P0",
+      "status": "not-sourced",
+      "source": null,
+      "notes": "Large organic tropical tree, branches, roots, layered foliage"
+    },
+    {
+      "id": "tree-variants",
+      "kind": "glb",
+      "priority": "P0",
+      "status": "not-sourced",
+      "source": null,
+      "notes": "3 diverse species, LOD"
+    },
+    {
+      "id": "fern-variants",
+      "kind": "glb",
+      "priority": "P0",
+      "status": "not-sourced",
+      "source": null,
+      "notes": "3 fern/broadleaf variants"
+    },
+    {
+      "id": "house-kit",
+      "kind": "glb",
+      "priority": "P0",
+      "status": "not-sourced",
+      "source": null,
+      "notes": "Timber walls, roofs, porch, window, awning"
+    },
+    {
+      "id": "terrain-dirt",
+      "kind": "pbr",
+      "priority": "P0",
+      "status": "not-sourced",
+      "source": null,
+      "notes": "Albedo normal roughness, blended grass edge"
+    },
+    {
+      "id": "terrain-grass",
+      "kind": "pbr",
+      "priority": "P0",
+      "status": "not-sourced",
+      "source": null,
+      "notes": "Natural soil and grass material"
+    },
+    {
+      "id": "stone-moss",
+      "kind": "pbr",
+      "priority": "P1",
+      "status": "not-sourced",
+      "source": null,
+      "notes": "Weathered mossy rocks"
+    },
+    {
+      "id": "sky-hdri",
+      "kind": "hdr",
+      "priority": "P0",
+      "status": "not-sourced",
+      "source": null,
+      "notes": "Natural image-based lighting"
+    },
+    {
+      "id": "hero-character",
+      "kind": "rigged-glb",
+      "priority": "P0",
+      "status": "not-sourced",
+      "source": null,
+      "notes": "Idle Walk Run Jump Land original animations"
+    },
+    {
+      "id": "village-props",
+      "kind": "glb",
+      "priority": "P1",
+      "status": "not-sourced",
+      "source": null,
+      "notes": "Baskets, fabrics, lanterns, roots, fencing"
+    }
+  ],
+  "budgets": {
+    "fpsDesktop": 55,
+    "fpsLow": 30,
+    "drawCallsMedium": 300,
+    "trianglesMedium": 1000000,
+    "initialArtMiB": 20,
+    "totalArtMiB": 45
+  },
+  "gates": {
+    "startupVerified": true,
+    "artLicensed": false,
+    "heroTreeIntegrated": false,
+    "cottagesIntegrated": false,
+    "terrainPbrIntegrated": false,
+    "cinematicLightingApproved": false,
+    "heroRigValidated": false,
+    "performanceVerified": false,
+    "readyForStory": false
+  },
+  "baseline": {
+    "date": "2026-11-13",
+    "evidence": "User screenshot and local PowerShell output at the visual-slice planning commit",
+    "fpsDisplayed": 56,
+    "modelsLoaded": "GLB 2/2",
+    "vitestPassed": 18,
+    "glbTestsPassed": 2,
+    "planTestsPassed": 4,
+    "typescript": "passed",
+    "viteBuild": "passed",
+    "caveat": "One viewport screenshot; not a 1080p median performance benchmark"
+  }
+}
