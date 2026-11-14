@@ -246,7 +246,10 @@ export function createAtmosphere(
   // ---- Post-processing --------------------------------------------------
   const pipeline = new DefaultRenderingPipeline("sl-ravan-cinematic", true, scene, [camera]);
   pipeline.samples = 4;
-  pipeline.fxaaEnabled = scene.getEngine().webGLVersion < 2;
+  // Scene.getEngine() is typed as AbstractEngine in Babylon 8.
+  // webGLVersion exists on the WebGL Engine, not on AbstractEngine/WebGPU.
+  const renderEngine = scene.getEngine();
+  pipeline.fxaaEnabled = renderEngine instanceof Engine && renderEngine.webGLVersion < 2;
   pipeline.bloomEnabled = true;
   pipeline.bloomThreshold = .8;
   pipeline.bloomKernel = 56;
