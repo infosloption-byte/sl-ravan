@@ -1,0 +1,91 @@
+# SL Ravan — Prototype Roadmap
+
+## Creative reference
+
+The supplied screenshot establishes the target mood: rich fantasy foliage, sunlight through branches, a third-person character, a winding dirt path, densely detailed timber architecture, and a village with strong foreground/midground/background composition.
+
+The reference is **inspiration, not a licensed asset**. All shipped models/textures must be made in-house or obtained with an appropriate game-distribution license.
+
+## Milestone A — Playable environment demo (this branch)
+
+- [x] Vite / React / TypeScript / Babylon.js setup
+- [x] Third-person character and chase/orbit camera
+- [x] Walk, sprint, jump and simple collisions
+- [x] Procedural forest terrain and a winding path
+- [x] Village houses, market stands, lanterns and scenery
+- [x] Ancient shrine interaction, village signs and location HUD
+- [x] Day/night lighting switch
+- [x] Local browser save with schema validation and tests
+- [ ] Validate browser performance and appearance on actual desktop hardware
+- [x] Add ancient Lanka architectural theme as a separate module
+- [x] Batch canopy and bushes using thin instancing for lower draw-call overhead
+- [ ] Replace placeholder models with polished assets
+
+## Visual identity
+
+This prototype is inspired by the ancient Lanka/Ravana mythology as a **fantasy setting**, not a historical reconstruction. Design pillars: (1) monumental carved stone with restrained bronze accents, (2) humid tropical greenery and flowing paths, (3) soft golden sunlight and turquoise highlights, (4) recognizable Sri Lankan environmental influences without copying protected game art, (5) scalable, optimized assets.
+
+The new `LankaTheme.ts` is intentionally independent of future story data. Gateway, lotus pools and ruins are scenery and optional interactions only. Environment geometry remains an original stylized blockout. Achieving the user's high-fidelity reference requires Blender-authored GLB modules, high-resolution PBR materials, animation, decals, atmospheric effects and profiling.
+
+## Security note
+
+The Vite dev server now binds only to `127.0.0.1` by default. `npm run dev:lan` explicitly enables LAN exposure and should be used only on a trusted network. Run `npm audit` to identify the precise installed dependency advisories; do not use `npm audit fix --force` without reviewing breaking changes.
+
+## Milestone B — Visual polish and streaming foundation
+
+1. Build a modular Sri Lankan ancient/fantasy architecture kit in Blender (woodwork, stone, reliefs, banners and roofs).
+2. Create properly licensed, highly detailed plants, surface materials and a character GLB with walking/running animations.
+3. Add art-directed sunlight, baked lighting where appropriate, fog, water, particles, and optimized shadows.
+4. Create chunk manifests, streaming/unloading, model LOD, compressed textures, and instancing for reusable scenery.
+5. Run GPU/CPU/draw-call profiling on target devices and set performance budgets.
+
+## Milestone C — Game systems
+
+- Separate engine-neutral simulation, input commands, authoritative state and renderer.
+- Replace prototype kinematic collisions with Havok physics and a character-controller design.
+- Inventory, interactive objects, NPC behavior, dialogue, audio, checkpoints, accessibility, and settings.
+- Implement persistent profiles and versioned saves through a Node.js backend and MySQL.
+- Add browser acceptance tests and save migration tests.
+
+## Milestone D — Multiplayer proof of concept
+
+- Put common simulation rules in a package that can run in Node.js.
+- Add a Colyseus authoritative room and remote session adapter.
+- Demonstrate two clients walking in the same test scene with interpolation.
+- Validate movement server-side and prevent clients from arbitrarily editing player/world state.
+- Add interest management and shared state persistence.
+
+## Milestone E — Ravana story production
+
+Story geography, characters, historical/fantastical interpretation, missions, and narration will be designed after the vertical slice is accepted.
+
+## Acceptance tests for the current demo
+
+1. A first-time visitor can launch the game with no external art asset download.
+2. Walking from the starting path to the village and shrine is possible.
+3. The player does not walk through cottage walls.
+4. WASD, Shift, Space, camera drag/zoom, Esc and E behave as documented.
+5. The shader and rendering pipeline survive browser refresh.
+6. Interaction with the shrine updates the objective message.
+7. The saved location and day/night state persist on refresh.
+8. The browser console contains no uncaught errors.
+9. The UI is usable at desktop resolutions and degrades gracefully at smaller windows.
+
+## Proposed asset pipeline
+
+Blender (.blend source) → validated glTF/GLB → texture compression / mesh optimization → hashed assets on a CDN → scene asset manifest. Avoid committing huge, unoptimized binaries to Git; use storage/CDN or Git LFS when justified.
+
+## Foliage regression diagnosis (13 November 2026)
+
+After converting foliage to thin instances, canopies and fern fronds disappeared. The root cause was wrapping `transforms.flatMap(m => m.asArray())` in a `Float32Array`. Typed arrays are not flattened by JavaScript `flatMap`, so each resulting element was coerced to NaN. A typed-array packer and three regression tests now cover this bug. The fix must be visually checked before the milestone is merged.
+
+The next art-production stage requires original detailed GLB characters, tree leaves, rocks and architectural meshes, and PBR material authoring. Procedural meshes are still only blockout assets.
+
+## Milestone 3 — Terrain finish and art readiness
+
+- [x] Layer a small repeated color-grain texture over the existing vertex-colored grass and dirt surface.
+- [x] Batch static decorative stones into two Babylon thin-instance draw groups.
+- [x] Document concrete GLB/PBR asset production, licensing and budgets in `docs/ART_ASSETS.md`.
+- [ ] Build and import the first authored Blender hero tree and temple module.
+- [ ] Optimize Babylon runtime bundle by measuring narrower import boundaries.
+- [ ] Recheck player camera, new texture appearance and full-scene FPS on desktop.
