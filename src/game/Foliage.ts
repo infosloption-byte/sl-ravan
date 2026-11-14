@@ -44,6 +44,8 @@ export function createFoliageMaterial(
   material.twoSidedLighting = true;
   material.diffuseColor = Color3.FromHexString(tint);
   material.specularColor = Color3.Black();
+  // Light leaking through thin leaves: a faint green glow keeps shaded foliage luminous.
+  material.emissiveColor = new Color3(.07, .12, .04);
   return material;
 }
 

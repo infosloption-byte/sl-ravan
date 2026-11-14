@@ -8,7 +8,7 @@ import { fbm, mulberry32, smoothstep } from "./Noise";
 import type { TerrainBounds } from "./TerrainPaint";
 import {
   createBarkTexture, createClothTexture, createFlowerTexture, createFrondTexture, createGrassTexture,
-  createGroundAlbedo, createGroundNormalMap, createLeafTexture, createPlankTexture, createRockTexture,
+  createGroundAlbedo, createGroundDetailTexture, createGroundNormalMap, createLeafTexture, createPlankTexture, createRockTexture,
   createThatchTexture
 } from "./ProceduralTextures";
 import {
@@ -128,6 +128,39 @@ function instanceBatch(mesh: Mesh, matrices: Matrix[], colors?: number[]) {
 }
 
 /**
+ * Splits a big thin-instance batch into spatial chunks (one cloned mesh each)
+ * so the GPU only draws chunks that are in view. One giant batch has a bounding
+ * box covering the whole map, so it could never be frustum-culled.
+ */
+function chunkedBatch(
+  source: Mesh, matrices: Matrix[], colors?: number[],
+  options: { cell?: number; onChunk?: (mesh: Mesh) => void } = {}
+) {
+  const cell = options.cell ?? 48;
+  const groups = new Map<string, number[]>();
+  matrices.forEach((matrix, index) => {
+    const t = matrix.getTranslation();
+    const key = Math.floor(t.x / cell) + ":" + Math.floor(t.z / cell);
+    const list = groups.get(key);
+    if (list) list.push(index); else groups.set(key, [index]);
+  });
+  let n = 0;
+  groups.forEach((indices) => {
+    const mesh = source.clone(source.name + "-chunk-" + n++);
+    mesh.isPickable = false;
+    mesh.thinInstanceSetBuffer("matrix", packInstanceMatrices(indices.map((i) => matrices[i])), 16, true);
+    if (colors && colors.length === matrices.length * 4) {
+      const packed = new Float32Array(indices.length * 4);
+      indices.forEach((src, k) => { for (let c = 0; c < 4; c++) packed[k * 4 + c] = colors[src * 4 + c]; });
+      mesh.thinInstanceSetBuffer("color", packed, 4, true);
+    }
+    mesh.thinInstanceRefreshBoundingInfo();
+    options.onChunk?.(mesh);
+  });
+  source.setEnabled(false);
+}
+
+/**
  * Coarse low-poly ground that extends the world to the horizon. It sits on
  * the same height field and hides underneath the detailed terrain, so the
  * playable area never ends in a visible edge.
@@ -172,7 +205,7 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
 
   const blockers: Blocker[] = [];
   const interactions: Interaction[] = [];
-  const glow = new GlowLayer("lantern-and-shrine-glow", scene);
+  const glow = new GlowLayer("lantern-and-shrine-glow", scene, { mainTextureFixedSize: 256, blurKernelSize: 24 });
   glow.intensity = .5;
 
   // ---- Textures and materials ------------------------------------------
@@ -202,7 +235,7 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
   clothBlue.backFaceCulling = false;
   clothCream.backFaceCulling = false;
   const gold = material(scene, "old-gold", "#ceb87e");
-  const coreMaterial = material(scene, "canopy-core", "#2c5a33");
+  const coreMaterial = material(scene, "canopy-core", "#4b7c37");
   const lantern = material(scene, "warm-lantern", "#fff2b6", { emissive: new Color3(1.5, 1.05, .5) });
   const shrineLight = material(scene, "ancient-arcane", "#72d6d3", { emissive: new Color3(.2, .7, .66) });
   const frondMaterial = createFoliageMaterial(scene, "fern-frond-mat", createFrondTexture(scene), "#ffffff", .38);
@@ -236,6 +269,14 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
   groundNormal.uScale = 70; groundNormal.vScale = 84;
   groundNormal.level = .6;
   groundMaterial.bumpTexture = groundNormal;
+  const groundDetail = createGroundDetailTexture(scene);
+  groundDetail.uScale = 160; groundDetail.vScale = 190;
+  if (groundMaterial.detailMap) {
+    groundMaterial.detailMap.texture = groundDetail;
+    groundMaterial.detailMap.isEnabled = true;
+    groundMaterial.detailMap.diffuseBlendLevel = .55;
+    groundMaterial.detailMap.bumpLevel = .8;
+  }
   groundMaterial.specularColor = Color3.Black();
   land.material = groundMaterial;
   land.receiveShadows = true;
@@ -257,12 +298,13 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
   // ---- Trees: instanced trunks + shadow-casting cores + leaf-card crowns --
   const trunkTransforms: Matrix[][] = [[], []];
   const coreTransforms: Matrix[] = [];
+  const wallCoreTransforms: Matrix[] = [];
   const clusterTransforms: Matrix[] = [];
   const clusterColors: number[] = [];
   const pushCluster = (scale: Vector3, position: Vector3, shade = 1) => {
     clusterTransforms.push(Matrix.Compose(scale, Quaternion.FromEulerAngles(random() * .5, random() * Math.PI * 2, random() * .5), position));
     clusterColors.push(
-      (.82 + random() * .3) * shade, (.88 + random() * .2) * shade, (.74 + random() * .24) * shade, 1
+      (.98 + random() * .3) * shade, (1.02 + random() * .2) * shade, (.86 + random() * .24) * shade, 1
     );
   };
 
@@ -283,7 +325,7 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
       const cx = x + offsetX;
       const cy = y + height * randomBetween(.70, 1.00);
       const cz = z + offsetZ;
-      coreTransforms.push(Matrix.Compose(
+      (detail > 0 ? coreTransforms : wallCoreTransforms).push(Matrix.Compose(
         new Vector3(radius * .7, radius * .55, radius * .7),
         Quaternion.FromEulerAngles(0, random() * Math.PI * 2, 0),
         new Vector3(cx, cy, cz)
@@ -341,11 +383,12 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
     shadows.addShadowCaster(source);
     instanceBatch(source, transforms);
   });
-  const coreSource = MeshBuilder.CreateIcoSphere("canopy-core-batch", { radius: 1, subdivisions: 2 }, scene);
+  const coreSource = MeshBuilder.CreateIcoSphere("canopy-core-batch", { radius: 1, subdivisions: 1 }, scene);
   coreSource.material = coreMaterial;
   coreSource.receiveShadows = true;
-  shadows.addShadowCaster(coreSource);
-  instanceBatch(coreSource, coreTransforms);
+  const wallCoreSource = coreSource.clone("canopy-core-wall");
+  chunkedBatch(coreSource, coreTransforms, undefined, { onChunk: (mesh) => shadows.addShadowCaster(mesh) });
+  chunkedBatch(wallCoreSource, wallCoreTransforms);
 
   // ---- Understory: ferns, bushes, grass and wildflowers -----------------
   const nearHouse = (x: number, z: number) =>
@@ -368,9 +411,9 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
       Quaternion.FromEulerAngles(0, random() * Math.PI * 2, 0),
       new Vector3(x, groundHeight(x, z) - .02, z)
     ));
-    fernColors.push(.78 + random() * .35, .88 + random() * .22, .7 + random() * .25, 1);
+    fernColors.push(.95 + random() * .3, 1.02 + random() * .2, .86 + random() * .24, 1);
   }
-  instanceBatch(fernSource, fernTransforms, fernColors);
+  chunkedBatch(fernSource, fernTransforms, fernColors);
 
   for (let i = 0; i < 170; i++) {
     const x = randomBetween(-88, 88);
@@ -380,7 +423,7 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
     pushCluster(
       new Vector3(radius * 1.5, radius * 1.05, radius * 1.4),
       new Vector3(x, groundHeight(x, z) + radius * .45, z),
-      .78
+      .95
     );
   }
 
@@ -394,7 +437,7 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
   tuftSource.receiveShadows = true;
   const tuftTransforms: Matrix[] = [];
   const tuftColors: number[] = [];
-  for (let i = 0; i < 9000 && tuftTransforms.length < 5200; i++) {
+  for (let i = 0; i < 7000 && tuftTransforms.length < 3800; i++) {
     const z = randomBetween(-102, 106);
     const nearTrail = random() < .7;
     const x = nearTrail ? pathCenter(z) + (random() > .5 ? 1 : -1) * randomBetween(2.4, 30) : randomBetween(-92, 92);
@@ -405,9 +448,9 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
       Quaternion.FromEulerAngles(0, random() * Math.PI * 2, 0),
       new Vector3(x, groundHeight(x, z) - .02, z)
     ));
-    tuftColors.push(.8 + random() * .35, .9 + random() * .2, .7 + random() * .25, 1);
+    tuftColors.push(.98 + random() * .3, 1.05 + random() * .2, .86 + random() * .24, 1);
   }
-  instanceBatch(tuftSource, tuftTransforms, tuftColors);
+  chunkedBatch(tuftSource, tuftTransforms, tuftColors);
 
   const flowerSource = createFlowerPatchMesh(scene);
   flowerSource.material = flowerMaterial;
@@ -423,7 +466,7 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
       new Vector3(x, groundHeight(x, z), z)
     ));
   }
-  instanceBatch(flowerSource, flowerTransforms);
+  chunkedBatch(flowerSource, flowerTransforms);
 
   // ---- Houses -----------------------------------------------------------
   const accentVines: Array<{ at: Vector3; scale: number }> = [];
@@ -522,7 +565,7 @@ export function createForestVillage(scene: Scene, shadows: ShadowGenerator): For
   for (const vine of accentVines) {
     pushCluster(new Vector3(vine.scale * 1.7, vine.scale * 1.4, vine.scale * 1.7), vine.at, .9);
   }
-  instanceBatch(clusterSource, clusterTransforms, clusterColors);
+  chunkedBatch(clusterSource, clusterTransforms, clusterColors);
 
   // ---- Market props -----------------------------------------------------
   function barrel(x: number, z: number) {
